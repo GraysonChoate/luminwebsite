@@ -1,0 +1,139 @@
+@import "tailwindcss";
+
+/* ─── Lumin brand tokens (Brand Guide V4 — do not invent values) ─── */
+:root {
+  --c-supernova: #5270ff;
+  --c-cosmos: #212121;
+  --c-light: #ffffff;
+  --c-aurora: #863399;
+  --c-meteor: #d1d1d4;
+  /* pop accents — accent moments only, never full-screen backgrounds */
+  --pop-galaxy: #e3ff70;
+  --pop-nebula: #ff5e2e;
+  --pop-flare: #ff004b;
+  --pop-stellar: #00ffba;
+
+  /* role tokens */
+  --surface-light: var(--c-light);
+  --surface-dark: var(--c-cosmos);
+  --text-on-light: var(--c-cosmos);
+  --text-on-dark: var(--c-light);
+  --text-muted: #7f7f83;
+  --hairline: rgba(33, 33, 33, 0.14);
+  --hairline-dark: rgba(255, 255, 255, 0.14);
+
+  /* layout (from audit: 12-col grid, ~3.65vw container pad) */
+  --container-pad: clamp(20px, 3.65vw, 62px);
+  --radius-btn: 8px;
+  --radius-media: 10px;
+  --radius-card: 17px;
+  --nav-top: 24px;
+}
+
+html {
+  background: var(--surface-light);
+  color: var(--text-on-light);
+}
+
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+
+body {
+  font-family: var(--font-heebo), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+.font-nav { font-family: var(--font-montserrat), sans-serif; }
+
+.container-pad { padding-inline: var(--container-pad); }
+
+/* display type scale (fluid, vw-derived like the reference architecture) */
+.type-statement { font-size: clamp(34px, 4.86vw, 84px); line-height: 1.0; letter-spacing: -0.045em; font-weight: 500; }
+/* min 26px so authored 2-line headlines survive ~360px viewports without re-wrapping */
+.type-hero { font-size: clamp(26px, 5.7vw, 96px); line-height: 0.98; letter-spacing: -0.02em; font-weight: 500; }
+.type-reveal { font-size: clamp(56px, 7.6vw, 130px); line-height: 0.95; letter-spacing: -0.01em; font-weight: 600; }
+.type-step { font-size: clamp(20px, 2.4vw, 36px); line-height: 1.2; letter-spacing: -0.018em; font-weight: 500; }
+.type-eyebrow { font-family: var(--font-montserrat), sans-serif; font-size: 12px; letter-spacing: 0.22em; font-weight: 600; text-transform: uppercase; }
+
+/* char-split spans */
+.split-char { display: inline-block; white-space: pre; will-change: opacity, transform; }
+
+/* buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: 41px; padding: 0 28px; border-radius: var(--radius-btn);
+  font-family: var(--font-montserrat), sans-serif;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  cursor: pointer; white-space: nowrap; border: none;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary { background: var(--c-supernova); color: var(--c-light); }
+.btn-secondary { background: var(--c-light); color: var(--c-cosmos); }
+
+/* Idle hero — the landed logo "hovers in place": a very slight, slow vertical
+   bob. Keyframes start/end at translateY(0) so the bob can be switched on after
+   the intro without a jump. The constant scale(1.04) matches the loader's own
+   scale (see PageLoader) AND gives the cover video overflow room so the bob
+   never reveals an edge. The idle container carries a resting scale(1.04) until
+   this animation takes over — so the loader→idle handoff is a straight dissolve
+   at identical scale and position. */
+@keyframes idle-hover-float {
+  0%, 100% { transform: scale(1.04) translateY(0); }
+  25%      { transform: scale(1.04) translateY(-5px); }
+  75%      { transform: scale(1.04) translateY(5px); }
+}
+.idle-float {
+  animation: idle-hover-float 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Ecosystem invitation — the "click the core" hint gently breathes during the
+   pinned dwell so the call-to-action reads as alive without adding any noise to
+   the already-busy sphere center. Sits on the clean dark band, so it's legible. */
+@keyframes eco-hint-breathe {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 1; }
+}
+.eco-hint-breathe { animation: eco-hint-breathe 2.6s ease-in-out infinite; }
+
+/* display type for the About origin statement — sized so the longest authored
+   line ("Then we built the system") holds one line inside its right-anchored
+   column at every desktop width */
+.type-origin { font-size: clamp(32px, 4.5vw, 66px); line-height: 1.06; letter-spacing: -0.03em; font-weight: 500; }
+
+/* ─── ProductStory shared geometry ───
+   The copy width, the wash stops, and any accent graphics all measure off the
+   SAME boundary (--ps-copy-edge), so no window width can make them collide:
+   the wash always starts a fixed gutter past wherever the copy actually ends. */
+:root {
+  --ps-copy-w: min(30rem, 38vw);
+  --ps-copy-edge: calc(var(--container-pad) + var(--ps-copy-w));
+  --ps-wash-gutter: clamp(48px, 6vw, 110px);
+  --ps-wash-fade: clamp(220px, 24vw, 360px);
+}
+
+/* ProductStory media wash.
+   Desktop: full-bleed footage across the pinned frame, but the copy side is
+   washed out ENTIRELY — zero alpha until a gutter past the copy edge (pure
+   page white under the text), then the footage dissolves in over a fixed
+   fade width. Right/top/bottom run clean to the frame edges.
+   Mobile: NO edge-fade mask — the media is a clean inset, rounded card (see
+   the component's mobile classes), so it never reads as a feathered blob. */
+@media (min-width: 1024px) {
+  .ps-media-mask {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(var(--ps-copy-edge) + var(--ps-wash-gutter)),
+      #000 calc(var(--ps-copy-edge) + var(--ps-wash-gutter) + var(--ps-wash-fade))
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      transparent calc(var(--ps-copy-edge) + var(--ps-wash-gutter)),
+      #000 calc(var(--ps-copy-edge) + var(--ps-wash-gutter) + var(--ps-wash-fade))
+    );
+  }
+}

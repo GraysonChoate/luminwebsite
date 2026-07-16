@@ -1,0 +1,29 @@
+{
+  "frame": [
+    1920,
+    1080
+  ],
+  "sphere": {
+    "cx": 959,
+    "cy": 539,
+    "w": 1010,
+    "h": 1010
+  },
+  "core": {
+    "cx": 976,
+    "cy": 538,
+    "w": 648,
+    "h": 356
+  },
+  "cameraZ": 8,
+  "cameraFov": 38,
+  "srcW": 1280,
+  "srcH": 720,
+  "renderer": "swiftshader-upscaled (composition/projection exact; shading approximate)",
+  "video_target_sphere": {
+    "w": 982,
+    "h": 974,
+    "cx": 961,
+    "cy": 539
+  }
+}

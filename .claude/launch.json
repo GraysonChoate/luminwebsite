@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lumin-site",
+      "runtimeExecutable": "/Users/graysonchoate/.nvm/versions/node/v24.18.0/bin/npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "/Users/graysonchoate/Documents/Lumin AI/lumin-site",
+      "port": 3000
+    }
+  ]
+}

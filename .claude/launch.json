@@ -5,7 +5,7 @@
       "name": "lumin-site",
       "runtimeExecutable": "/Users/graysonchoate/.nvm/versions/node/v24.18.0/bin/npm",
       "runtimeArgs": ["run", "dev"],
-      "cwd": "/Users/graysonchoate/Documents/Lumin AI/lumin-site",
+      "cwd": "/Users/graysonchoate/Documents/Lumin AI/Official Lumin Website Folder/lumin-site",
       "port": 3000
     }
   ]

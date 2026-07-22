@@ -5,8 +5,9 @@ import { NAV } from "@/lib/copy";
 import { getLenis } from "@/components/SmoothScroll";
 
 /**
- * Constant fixed nav pill: translucent dark + blur, never hides, never
- * restyles on scroll. Items anchor-scroll to page sections via Lenis.
+ * Constant fixed nav pill: present from the moment the loader lifts (the orb
+ * emerge covers it while playing), including over the stationary idle loop, and
+ * throughout the whole site. Items anchor-scroll to page sections via Lenis.
  */
 export default function NavPill() {
   const [menuOpen, setMenuOpen] = useState(false);

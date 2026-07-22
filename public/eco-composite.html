@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumin Ecosystem — light composite</title>
+<style>
+  :root{
+    --mark-size: 5.8%;    /* diameter of the BLOWN-OUT core disc */
+    --mark-gain: 1;       /* overall emission of the mark */
+    --spill:     .8;       /* how much light it throws onto the sphere */
+    --orb-size:  3.1%;    /* diameter of each orb's blown-out core */
+    --orb-gain:  1;       /* overall emission of the orbs */
+    --well:      .88;       /* how far the plate glow is knocked down behind the mark */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#05060a;color:#cfd6e6;
+    font:14px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif}
+  .wrap{min-height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:16px;padding:20px}
+
+  .stage{position:relative;width:min(96vw,1600px);aspect-ratio:2720/1536;
+    background:#000;overflow:hidden;border-radius:6px;
+    box-shadow:0 30px 90px rgba(0,0,0,.85)}
+  .layer{position:absolute;inset:0}
+  .layer[hidden]{display:none}
+
+  /* ───────── L1 · photoreal plate ───────── */
+  #plate{background:url("/eco/plate.jpg") center/cover no-repeat}
+
+  /* ───────── L1b · CORE EXPOSURE ─────────
+     The plate's centre is clipped to pure white, so anything white laid on it
+     is invisible — both clip at 255. This pulls the core's exposure down across
+     a wide, extremely soft falloff so the mark has headroom to become the
+     brightest point. Wide + soft = reads as exposure. Small + hard = reads as
+     a hole punched in the image. */
+  #expose{mix-blend-mode:multiply;display:grid;place-items:center}
+  #expose::before{content:"";width:46%;aspect-ratio:1;border-radius:50%;
+    background:radial-gradient(circle,
+      rgba(6,9,22,calc(1*var(--well))) 0%,
+      rgba(9,13,30,calc(.97*var(--well))) 11%,
+      rgba(20,27,58,calc(.88*var(--well))) 21%,
+      rgba(46,58,112,calc(.70*var(--well))) 33%,
+      rgba(96,112,180,calc(.46*var(--well))) 47%,
+      rgba(160,174,222,calc(.24*var(--well))) 63%,
+      rgba(214,222,244,calc(.08*var(--well))) 78%,
+      rgba(255,255,255,0) 92%);
+    filter:blur(2.2vw)}
+
+  /* ───────── L2 · light spilling onto the sphere ─────────
+     A real light source lights what's around it. This is that. */
+  #spill{mix-blend-mode:screen;display:grid;place-items:center}
+  #spill::before{content:"";width:62%;aspect-ratio:1;border-radius:50%;
+    background:radial-gradient(circle,
+      rgba(82,112,255,0) 0%,
+      rgba(82,112,255,0) 9%,
+      rgba(168,196,255,calc(.20*var(--spill))) 19%,
+      rgba(110,146,255,calc(.20*var(--spill))) 34%,
+      rgba(96,80,190,calc(.08*var(--spill)))   56%,
+      rgba(82,112,255,0) 76%)}
+
+  /* ───────── L3 · connective threads ───────── */
+
+  /* ═════════ THE EMISSION ENGINE ═════════
+     Light is ADDITIVE. Every glowing thing here is the same mark or dot
+     stacked N times at increasing blur and falling opacity, composited with
+     plus-lighter. That's a real bloom pyramid — it's how compositors do it,
+     and it's why the centre blows out to white while the halo stays coloured.
+     Nothing is opaque. Nothing has an edge. */
+  .emit{position:absolute;inset:0;mix-blend-mode:plus-lighter;
+    background-position:center;background-repeat:no-repeat;background-size:contain}
+
+  /* ───────── L4 · the six orbs ───────── */
+  #orbs .orb{position:absolute;left:var(--x);top:var(--y);width:var(--orb-size);
+    aspect-ratio:1;transform:translate(-50%,-50%)}
+  .orb .g{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    border-radius:50%;mix-blend-mode:plus-lighter}
+  /* the blown-out core */
+  .orb .g0{width:100%;aspect-ratio:1;
+    background:radial-gradient(circle,#fff 0%,#fff 52%,rgba(226,238,255,.85) 74%,transparent 96%);
+    opacity:calc(1*var(--orb-gain))}
+  /* bloom pyramid */
+  .orb .g1{width:260%;aspect-ratio:1;filter:blur(.5vw);
+    background:radial-gradient(circle,rgba(255,255,255,.9) 0%,rgba(190,214,255,.5) 45%,transparent 70%);
+    opacity:calc(.85*var(--orb-gain))}
+  .orb .g2{width:620%;aspect-ratio:1;filter:blur(1.4vw);
+    background:radial-gradient(circle,rgba(150,185,255,.6) 0%,rgba(82,112,255,.3) 45%,transparent 72%);
+    opacity:calc(.7*var(--orb-gain))}
+  .orb .g3{width:1500%;aspect-ratio:1;filter:blur(3vw);
+    background:radial-gradient(circle,rgba(82,112,255,.34) 0%,rgba(110,86,190,.13) 45%,transparent 74%);
+    opacity:calc(.6*var(--orb-gain))}
+  .orb.far{opacity:.55;filter:blur(.1vw) saturate(1.1)}
+
+  /* ───────── L5 · the mark, as emitted light ───────── */
+  #core{display:grid;place-items:center}
+  .mark{position:relative;width:var(--mark-size);aspect-ratio:1}
+  /* every copy is the SAME logo alpha — so the glow carries the mark's shape,
+     and where the three bars are transparent, less light accumulates.
+     That is exactly why the bars read as darker notches inside the blowout
+     instead of as painted black bars. */
+  .mark .m{background-image:url("/assets/lumin-icon.png")}
+  /* The sharp copy must OUT-ACCUMULATE the bloom at the centre, or the blurred
+     copies spill white into the bar gaps and the mark becomes a featureless
+     blob. So: m0 is bright and crisp, and every bloom layer is pushed well
+     OUTSIDE the disc (large inset) and kept dim, so it haloes without filling. */
+  .mark .m0{filter:brightness(3);opacity:calc(1*var(--mark-gain))}
+  .mark .m1{inset:-9%;filter:blur(.26vw) brightness(1.5);opacity:calc(.34*var(--mark-gain))}
+  .mark .m2{inset:-70%;filter:blur(1.5vw);opacity:calc(.30*var(--mark-gain))}
+  .mark .m3{inset:-175%;filter:blur(3.1vw);opacity:calc(.28*var(--mark-gain))}
+  .mark .m4{inset:-350%;filter:blur(5.8vw);opacity:calc(.13*var(--mark-gain))}
+  /* the round atmospheric halo the disc throws, tinted supernova */
+  .mark .halo{inset:-480%;border-radius:50%;background:radial-gradient(circle,
+      transparent 0%,rgba(198,218,255,.22) 16%,
+      rgba(82,112,255,.16) 36%,rgba(120,80,190,.06) 60%,transparent 82%);
+    filter:blur(1.6vw);opacity:calc(.55*var(--mark-gain))}
+
+
+
+  /* ───────── controls ───────── */
+  .panel{width:min(96vw,1600px);display:flex;flex-wrap:wrap;gap:9px 20px;
+    align-items:center;padding:13px 16px;border:1px solid #1c2233;
+    border-radius:8px;background:#0a0d15}
+  .panel h1{font-size:12px;font-weight:600;letter-spacing:.09em;
+    text-transform:uppercase;color:#8fa0c4}
+  label{display:flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+  input[type=range]{width:96px;accent-color:#5270FF}
+  input[type=checkbox]{accent-color:#5270FF;width:14px;height:14px}
+  .note{width:min(96vw,1600px);font-size:12px;color:#6f7d99;line-height:1.65}
+  .note b{color:#9fb0d4}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage" id="stage">
+    <div class="layer" id="plate"></div>
+    <div class="layer" id="expose"></div>
+    <div class="layer" id="spill"></div>
+
+    <div class="layer" id="orbs"></div>
+
+    <div class="layer" id="core">
+      <div class="mark">
+        <span class="emit halo"></span>
+        <span class="emit m m4"></span>
+        <span class="emit m m3"></span>
+        <span class="emit m m2"></span>
+        <span class="emit m m1"></span>
+        <span class="emit m m0"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h1>Layers</h1>
+    <label><input type="checkbox" checked data-t="plate">Plate</label>
+    <label><input type="checkbox" checked data-t="expose">Exposure</label>
+    <label><input type="checkbox" checked data-t="spill">Spill</label>
+    <label><input type="checkbox" checked data-t="orbs">Orbs</label>
+    <label><input type="checkbox" checked data-t="core">Mark</label>
+    <label>Mark size <input type="range" min="2" max="18" step=".1" value="5.8" data-v="--mark-size" data-u="%"></label>
+    <label>Mark gain <input type="range" min="0" max="2" step=".05" value="1" data-v="--mark-gain"></label>
+    <label>Spill <input type="range" min="0" max="2" step=".05" value=".8" data-v="--spill"></label>
+    <label>Orb size <input type="range" min=".4" max="7" step=".1" value="3.1" data-v="--orb-size" data-u="%"></label>
+    <label>Orb gain <input type="range" min="0" max="2" step=".05" value="1" data-v="--orb-gain"></label>
+    <label>Core exposure <input type="range" min="0" max="1" step=".02" value=".88" data-v="--well"></label>
+  </div>
+
+  <p class="note">
+    <b>STILL FRAME — nothing animates.</b> We're molding the master image.
+    <b>Everything glowing is additive light, not artwork.</b> The mark is the same logo alpha stacked six times at
+    increasing blur with <b>plus-lighter</b> — a real bloom pyramid. The centre accumulates past pure white and blows
+    out; the three bars stay transparent so less light gathers there, which is why they read as darker notches
+    <i>inside</i> the blowout rather than as painted bars. Nothing is opaque and nothing has an edge.
+    The <b>Spill</b> layer is the light the mark casts back onto the sphere. Drag any orb to reposition — coordinates
+    print to the console.
+  </p>
+</div>
+
+<script>
+const ORBS=[
+ {id:'one-1',x:35.2,y:25.5,depth:'near',dur:4.0,delay:'-0s'},
+ {id:'one-2',x:28.6,y:49.0,depth:'far', dur:4.8,delay:'-1.3s'},
+ {id:'one-3',x:34.4,y:74.5,depth:'near',dur:3.6,delay:'-2.4s'},
+ {id:'pro-1',x:64.8,y:28.5,depth:'far', dur:4.4,delay:'-0.8s'},
+ {id:'pro-2',x:71.4,y:53.0,depth:'near',dur:3.9,delay:'-2.9s'},
+ {id:'pro-3',x:65.6,y:77.5,depth:'far', dur:5.0,delay:'-1.8s'},
+];
+const CX=50,CY=50,NS='http://www.w3.org/2000/svg';
+const orbLayer=document.getElementById('orbs');
+
+ORBS.forEach(o=>{
+
+  const el=document.createElement('div');
+  el.className='orb '+o.depth; el.id=o.id;
+  el.style.cssText=`--x:${o.x}%;--y:${o.y}%`;
+  el.innerHTML='<span class="g g3"></span><span class="g g2"></span>'+
+               '<span class="g g1"></span><span class="g g0"></span>';
+  orbLayer.appendChild(el);
+});
+
+document.querySelectorAll('[data-t]').forEach(cb=>cb.addEventListener('change',
+  ()=>document.getElementById(cb.dataset.t).hidden=!cb.checked));
+document.querySelectorAll('[data-v]').forEach(sl=>sl.addEventListener('input',
+  ()=>document.documentElement.style.setProperty(sl.dataset.v,sl.value+(sl.dataset.u||''))));
+/* drag to reposition */
+const stage=document.getElementById('stage');let drag=null;
+orbLayer.addEventListener('pointerdown',e=>{
+  const o=e.target.closest('.orb'); if(!o)return;
+  drag=o; o.setPointerCapture(e.pointerId); e.preventDefault();
+});
+stage.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const r=stage.getBoundingClientRect();
+  const x=+(((e.clientX-r.left)/r.width)*100).toFixed(1);
+  const y=+(((e.clientY-r.top)/r.height)*100).toFixed(1);
+  drag.style.setProperty('--x',x+'%'); drag.style.setProperty('--y',y+'%');
+});
+stage.addEventListener('pointerup',()=>{
+  if(!drag)return;
+  console.table([...document.querySelectorAll('.orb')].map(o=>({
+    id:o.id,x:parseFloat(o.style.getPropertyValue('--x')),
+    y:parseFloat(o.style.getPropertyValue('--y')),
+    depth:o.classList.contains('far')?'far':'near'})));
+  drag=null;
+});
+</script>
+</body>
+</html>

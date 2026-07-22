@@ -39,17 +39,26 @@ const WINDOWS = JOURNEY.beats.map((b) => {
   };
 });
 
+/** Orb transition, pre-sliced to image frames so scroll scrubs it SMOOTHLY
+ * (no on-the-fly video seeking = no choppiness), exactly like the journey. */
+const TRANSITION_FRAMES = 97;
+const transitionUrls = Array.from(
+  { length: TRANSITION_FRAMES },
+  (_, i) => `/frames/transition/f_${String(i + 1).padStart(3, "0")}.webp`,
+);
+
 export default function Hero() {
   const sectionRef = useRef<HTMLElement>(null);
   const canvasWrapRef = useRef<HTMLDivElement>(null);
   const copyRef = useRef<HTMLDivElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
   const idleRef = useRef<HTMLDivElement>(null);
-  const introRef = useRef<HTMLVideoElement>(null);
-  const loopRef = useRef<HTMLVideoElement>(null);
+  const stationaryRef = useRef<HTMLVideoElement>(null);
+  const transitionLayerRef = useRef<HTMLDivElement>(null);
+  const transitionProgressRef = useRef(0);
   const progressRef = useRef(0);
   const [variant, setVariant] = useState<"desktop" | "mobile">("desktop");
-  const [introDone, setIntroDone] = useState(false); // full logo clip → hover loop
+  const [openingDone, setOpeningDone] = useState(false); // orb-emerge loader lifted
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -59,48 +68,17 @@ export default function Hero() {
     return () => mq.removeEventListener("change", apply);
   }, []);
 
-  // Opening = ONE baked clip (dope-intro: Vid1 ignition xfade Vid2 rise), so
-  // there is no runtime seam to misalign. It autoplays under the black loader
-  // (which lifts on the `lumin:introPlaying` signal, revealing it from its black
-  // ignition start), then hands off to the seamless hover loop when it ends.
+  // Opening orbs. The loader (PageLoader) plays "Orb Emerge"; beneath it the
+  // "Orb Stationary" idle loops from mount, so when the loader lifts the idle is
+  // already running (seamless handoff). "Orb Transition" also loops hidden,
+  // ready to bridge into the journey on first scroll (driven by the scroll
+  // timeline below). `openingDone` (loader lifted) ungates the scroll hint.
   useEffect(() => {
-    const intro = introRef.current;
-    const loop = loopRef.current;
-    if (!intro || !loop) return;
-    loop.play().catch(() => {}); // keep the hover loop running (hidden) so the handoff is instant
-    intro.play().catch(() => {}); // belt-and-suspenders alongside the autoPlay attr
-    // tell the loader the intro is actually painting frames → safe to lift
-    const onPlaying = () => {
-      (window as unknown as { __luminIntroPlaying?: boolean }).__luminIntroPlaying = true;
-      window.dispatchEvent(new Event("lumin:introPlaying"));
-    };
-    intro.addEventListener("playing", onPlaying, { once: true });
-    if (!intro.paused) onPlaying();
-    // hand off to the hover loop when the intro finishes. To make the "catch"
-    // invisible, seek the loop to its turnaround frame (t≈1.0 = the boomerang's
-    // apex = Vid2's last hover frame) so the crossfade blends two near-identical
-    // frames instead of two arbitrary ones. Guarded so timeupdate can't re-seek
-    // it every tick. Drive the swap with state so a re-render can't revert it.
-    let handed = false;
-    const handoff = () => {
-      if (handed) return;
-      handed = true;
-      try {
-        loop.currentTime = 1.0;
-      } catch {}
-      loop.play().catch(() => {});
-      setIntroDone(true);
-    };
-    const onTime = () => {
-      if (intro.duration && intro.currentTime >= intro.duration - 0.06) handoff();
-    };
-    intro.addEventListener("ended", handoff);
-    intro.addEventListener("timeupdate", onTime);
-    return () => {
-      intro.removeEventListener("playing", onPlaying);
-      intro.removeEventListener("ended", handoff);
-      intro.removeEventListener("timeupdate", onTime);
-    };
+    stationaryRef.current?.play().catch(() => {}); // idle loop plays; transition is scrubbed, never played
+    const onEmerge = () => setOpeningDone(true);
+    if ((window as unknown as { __luminEmergeDone?: boolean }).__luminEmergeDone) onEmerge();
+    else window.addEventListener("lumin:emergeDone", onEmerge, { once: true });
+    return () => window.removeEventListener("lumin:emergeDone", onEmerge);
   }, []);
 
   useEffect(() => {
@@ -120,13 +98,37 @@ export default function Hero() {
         },
       });
 
-      // 1b. idle hero → journey: the looping logo video covers the first frame
-      // until the visitor scrolls, then fades out across the opening sliver of
-      // the walk, revealing the scrubbed footage underneath.
-      gsap.to(idleRef.current, {
-        autoAlpha: 0,
-        ease: "none",
-        scrollTrigger: { trigger: section, start: "top top", end: "top+=180 top", scrub: true },
+      // 1b. opening → journey bridge. The "Orb Stationary" idle loops on its
+      // own. The "Orb Transition" clip does NOT autoplay and does NOT loop — it
+      // is SCRUBBED by scroll (its playhead follows the scrollbar = "plays in
+      // response to the parallax"). On the first ~360px: the stationary
+      // crossfades to the (scrubbing) transition, the transition plays through
+      // to its last frame as you scroll, then the whole idle layer clears to
+      // hand off into the check-in. Reverses cleanly on scroll-up.
+      const c01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
+      ScrollTrigger.create({
+        trigger: section,
+        start: "top top",
+        end: "top+=300 top",
+        scrub: true,
+        onUpdate: (self) => {
+          const p = self.progress; // 0..1 over the opening window
+          const stat = stationaryRef.current;
+          const layer = transitionLayerRef.current;
+          const idle = idleRef.current;
+          if (!stat || !layer || !idle) return;
+          // SMOOTH: scrub the transition's pre-sliced FRAMES with the scroll
+          // (a canvas frame-swap — no video seeking, so no choppiness). Its
+          // motion carries the orb → check-in as the parallax pull-in.
+          transitionProgressRef.current = p;
+          // brief blend from the looping orb into the transition's first frame…
+          layer.style.opacity = String(c01(p / 0.1));
+          stat.style.opacity = String(c01(1 - p / 0.12));
+          // …then a DIRECT hand-off at the end: the transition's last frame IS
+          // the check-in, so hard-cut to the journey (no fade "into the scene").
+          idle.style.opacity = "1";
+          idle.style.visibility = p >= 0.985 ? "hidden" : "visible";
+        },
       });
 
       // 2. caption cycle — one scrubbed timeline; char cascades budgeted
@@ -213,36 +215,31 @@ export default function Hero() {
           />
         </div>
 
-        {/* idle hero — threaded from the loader. The FULL logo clip plays once
-            from frame 0 the instant the loader (Vid1) lifts (disc → logo rises →
-            hover), then crossfades to the seamless hover loop, which "hovers in
-            place" (idle-float bob) until first scroll. Container floats + is
-            faded out by the scroll timeline. */}
-        <div
-          ref={idleRef}
-          className={`absolute inset-0 z-[3]${introDone ? " idle-float" : ""}`}
-          style={{ background: "#050508", transform: "scale(1.04)" }}
-        >
+        {/* opening idle. "Orb Stationary" loops here (revealed when the loader's
+            "Orb Emerge" lifts); "Orb Transition" sits above it, hidden, and is
+            crossfaded in on first scroll (see the openTl timeline) to bridge into
+            the journey. Both fade out with this layer to reveal the check-in. */}
+        <div ref={idleRef} className="absolute inset-0 z-[3]" style={{ background: "#050508" }}>
           <video
-            ref={introRef}
-            src="/media/dope-intro.mp4"
+            ref={stationaryRef}
+            src="/media/orb-stationary.mp4"
             autoPlay
-            muted
-            playsInline
-            preload="auto"
-            className="absolute inset-0 h-full w-full object-cover"
-            style={{ opacity: introDone ? 0 : 1, transition: "opacity 0.6s ease" }}
-          />
-          <video
-            ref={loopRef}
-            src="/media/dope-icon-2-loop.mp4"
             muted
             loop
             playsInline
             preload="auto"
             className="absolute inset-0 h-full w-full object-cover"
-            style={{ opacity: introDone ? 1 : 0, transition: "opacity 0.6s ease" }}
+            style={{ opacity: 1 }}
           />
+          {/* transition = pre-sliced frames, scrubbed by scroll (smooth) */}
+          <div ref={transitionLayerRef} className="absolute inset-0" style={{ opacity: 0 }}>
+            <FrameScrubber
+              progressRef={transitionProgressRef}
+              frameCount={TRANSITION_FRAMES}
+              frameUrls={transitionUrls}
+              fit="cover"
+            />
+          </div>
         </div>
         {/* legibility scrim for the lower caption band */}
         <div
@@ -269,9 +266,9 @@ export default function Hero() {
       </div>
 
       {/* cursor-following scroll hint — gated so it only appears AFTER the
-          opening logo animation finishes (introDone); the scroll-driven
+          opening (orb-emerge loader lifted, openingDone); the scroll-driven
           opacity/cursor-follow live on the inner element. */}
-      <div style={{ opacity: introDone ? 1 : 0, transition: "opacity 0.7s ease" }}>
+      <div style={{ opacity: openingDone ? 1 : 0, transition: "opacity 0.7s ease" }}>
         <div
           ref={indicatorRef}
           className="font-nav fixed left-[var(--container-pad)] top-[45vh] z-20 text-[11px] font-semibold uppercase tracking-[0.3em]"

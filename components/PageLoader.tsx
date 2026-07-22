@@ -4,65 +4,93 @@ import { useEffect, useRef, useState } from "react";
 import { gsap } from "@/lib/motion";
 
 /**
- * Load overlay (z-999) — now just a black mask over the first paint.
- *
- * The "Dope icon" opening is a SINGLE baked clip (public/media/dope-intro.mp4 =
- * Vid1 ignition xfade Vid2 rise) that autoplays in the hero from mount, so there
- * is no loader→idle video seam to align. This overlay only hides the hydration
- * flash: it lifts the instant the hero intro reports it is painting frames
- * (`lumin:introPlaying`) — revealing the clip from its own black ignition start,
- * so the reveal is black→black. Redundant escape hatches (min-show floor,
- * wall-clock cap, instant drop when the tab is hidden) guarantee it can't stick.
+ * Opening loader (z-999) — plays the "Orb Emerge" clip full-screen on black,
+ * then lifts, revealing the hero's looping "Orb Stationary" idle beneath it.
+ * Signals `lumin:emergeDone` on lift (the hero ungates its scroll hint on it).
+ * Escape hatches: play to `ended`, wheel/touch skip after a floor, hard cap,
+ * instant drop when the tab is hidden.
  */
-const MIN_SHOW = 0.3; // seconds — avoid an instant flash-fade of the mask
-const MAX_WAIT = 5; // seconds — hard cap even if the intro never signals
+const MIN_SHOW = 0.8; // seconds — floor before a wheel/touch may skip the emerge
+const MAX_WAIT = 13; // seconds — hard cap even if the clip never fires `ended`
 
 export default function PageLoader() {
   const rootRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoFailed, setVideoFailed] = useState(false);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    const v = videoRef.current;
+    if (v) v.play().catch(() => setVideoFailed(true));
+
     const start = performance.now();
     let released = false;
     const release = () => {
       if (released) return;
       released = true;
+      (window as unknown as { __luminEmergeDone?: boolean }).__luminEmergeDone = true;
+      window.dispatchEvent(new Event("lumin:emergeDone"));
       if (document.visibilityState === "hidden") {
         setDone(true);
         return;
       }
       gsap.to(rootRef.current, {
         autoAlpha: 0,
-        duration: 0.6,
+        duration: 0.7,
         ease: "power2.inOut",
         onComplete: () => setDone(true),
       });
     };
 
-    // lift once the baked intro is actually playing (honoring the min-show floor)
-    const onPlaying = () => {
-      const wait = Math.max(0, MIN_SHOW * 1000 - (performance.now() - start));
-      setTimeout(release, wait);
-    };
-    if ((window as unknown as { __luminIntroPlaying?: boolean }).__luminIntroPlaying) onPlaying();
-    else window.addEventListener("lumin:introPlaying", onPlaying, { once: true });
+    const onEnded = () => release();
+    v?.addEventListener("ended", onEnded);
 
     const maxTimer = setTimeout(release, MAX_WAIT * 1000);
+    const onIntent = () => {
+      if ((performance.now() - start) / 1000 >= MIN_SHOW) release();
+    };
+    window.addEventListener("wheel", onIntent, { passive: true });
+    window.addEventListener("touchstart", onIntent, { passive: true });
 
     return () => {
-      window.removeEventListener("lumin:introPlaying", onPlaying);
+      v?.removeEventListener("ended", onEnded);
+      window.removeEventListener("wheel", onIntent);
+      window.removeEventListener("touchstart", onIntent);
       clearTimeout(maxTimer);
     };
   }, []);
+
+  // if the clip fails to decode, don't hold the page — drop after the floor
+  useEffect(() => {
+    if (!videoFailed) return;
+    const t = setTimeout(() => {
+      (window as unknown as { __luminEmergeDone?: boolean }).__luminEmergeDone = true;
+      window.dispatchEvent(new Event("lumin:emergeDone"));
+      setDone(true);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [videoFailed]);
 
   if (done) return null;
 
   return (
     <div
       ref={rootRef}
-      className="fixed inset-0 z-[999]"
+      className="fixed inset-0 z-[999] flex items-center justify-center overflow-hidden"
       style={{ background: "#050508" }}
       aria-hidden="true"
-    />
+    >
+      {!videoFailed && (
+        <video
+          ref={videoRef}
+          src="/media/orb-emerge.mp4"
+          muted
+          playsInline
+          preload="auto"
+          onError={() => setVideoFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      )}
+    </div>
   );
 }

@@ -1,9 +1,27 @@
-# Ecosystem — build status & handoff (2026-07-23, updated — MASTER FRAME LOCKED)
+# Ecosystem — build status & handoff (2026-07-24, updated — MASTER FRAME LOCKED, v5-final)
 
 Cross-account handoff for the Lumin ecosystem visualization. Read this first before touching `public/eco/`.
 
 ## ✅ CURRENT MASTER — the floating command hub, LOCKED and APPROVED
-**`public/eco/hub/COMMAND-HUB-MIRRORED.png`** — Lumin Pro (6 nodes) on the viewer's LEFT, Lumin One (5 nodes) on the RIGHT. **This is the actively-maintained orientation** — every fix past the initial lock (orb relocation, uniform sizing, rebalancing) was applied to this one specifically.
+**`public/eco/hub/COMMAND-HUB-MIRRORED.png`** = `01-specs/ecosystem-refs/COMMAND-HUB-MIRRORED-v5-final.png` — Lumin Pro (6 nodes) on the viewer's LEFT, Lumin One (5 nodes) on the RIGHT, **11 orbs total (verified — a 12-orb duplicate-blue bug was caught and fixed on the way here, see below)**. This is the actively-maintained orientation — every fix past the initial lock was applied to this one specifically.
+
+### What's correct in v5-final, verified
+- 11 orbs, exact count confirmed by direct crop-count on both sides (not just trusted) — 6 left (2 orange/Move+Station-adjacent... see taxonomy below, 2 red, 2 purple), 5 right (2 blue-family, teal, lime, green).
+- Core relocated to the front-left rail (not the recessed rear position from the initial lock), Academy moved with it.
+- All 11 orbs uniform size — the original brief's large/small hierarchy is superseded per explicit user instruction.
+- Centre icon: three-bar mark legible, centre bar deliberately slightly taller than the two flanking bars, radiant/blown-out with dense fine light-streak detail through the beam and rings.
+- Orb hues individually correct (verified per-orb, not just glanced at — this mattered, see below).
+
+### ⚠️ OPEN — ambient colour grade is NOT an exact match to the user's reference
+The user has an exact colour reference in mind (a specific earlier render, still on disk at `01-specs/ecosystem-refs/` from this same lineage — check chat history / the compose script trail if picking this back up, the file itself wasn't separately named). Multiple attempts to close this gap tonight **made things worse and were discarded**:
+1. A masked local pixel-correction (protect saturated pixels, pull red down elsewhere) — **broke hues**: orange/purple orbs shifted toward teal/cyan. Discarded.
+2. A second, differently-masked local attempt — same failure mode, still broke orb colours. Discarded.
+3. A full LAB-space statistical colour-transfer (Reinhard-style mean/std matching against the reference) — **also broke hues**: orange shifted toward pink. Discarded.
+4. Two Seedream regeneration passes (image-to-image, explicit colour-only instructions) — didn't break anything, but under/over-shot the target and one of them reintroduced red contamination as a side effect of an unrelated "increase icon radiance" pass done in between.
+
+**Lesson, if this resumes:** every FULLY AUTOMATED attempt at this specific colour-match tonight failed, three of them destructively. The one thing that partially worked (without breaking hues) was a narrowly-scoped Seedream regeneration pass with an explicit reference image — slow, needs verification by eye each time (not just a numeric proxy — a single-patch R/B ratio measurement proved actively misleading twice, since it doesn't distinguish "the ambient wash is off" from "an orb happens to sit in the sampled patch"). If picking this up again: (a) use Seedream only, not local pixel/LAB math — the failure mode there is destructive, not just imprecise; (b) verify by eye on the full image AND by cropping individual orbs, not by trusting one aggregate number; (c) do it as its own isolated task on a rested pass, separate from any other change.
+
+v4 (pre-relocate/pre-rebalance, One-left/Pro-right or Pro-left/One-right) and the intermediate steps between the initial lock and v5-final are preserved in `01-specs/ecosystem-refs/COMMAND-HUB-MIRRORED-v2-*` through `-v4-*` for full lineage.
 
 **`public/eco/hub/COMMAND-HUB-MASTER.png`** — the ORIGINAL orientation (One left / Pro right). **Stale — has NOT received the fixes below** (still has the old big/small orb hierarchy, Core still sitting rear-left unfixed). If this orientation is wanted again, regenerate it as a pure horizontal mirror of the current `COMMAND-HUB-MIRRORED.png` (the same zero-cost, zero-risk technique used earlier — the icon is bilaterally symmetric and survives a flip intact) rather than resuming edits on the stale file directly.
 

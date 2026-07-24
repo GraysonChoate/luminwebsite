@@ -1,73 +1,46 @@
-# Ecosystem — build status & handoff (2026-07-23, updated — command-table direction)
+# Ecosystem — build status & handoff (2026-07-23, updated — MASTER FRAME LOCKED)
 
 Cross-account handoff for the Lumin ecosystem visualization. Read this first before touching `public/eco/`.
 
-## ⚠️ SUPERSEDED — do not resume either of these, kept only as history
+## ✅ CURRENT MASTER — the floating command hub, LOCKED and APPROVED
+**`public/eco/hub/COMMAND-HUB-MASTER.png`** — Lumin One (5 nodes) on the viewer's LEFT, Lumin Pro (6 nodes) on the RIGHT.
+**`public/eco/hub/COMMAND-HUB-MIRRORED.png`** — same image, pure horizontal mirror. Lumin Pro on the LEFT, Lumin One on the RIGHT. Both are approved; which one ships is still open — see NEXT below.
+
+Both fully satisfy the master brief at `01-specs/ecosystem-command-hub-brief.md` (outside the repo — the two full verbatim spec documents the user wrote: hub/node/nucleus design + page positioning/floor/transition rules). Read that file before generating anything else for this section.
+
+**What's in the frame, verified:**
+- Command hub floats above a separate constellation floor, real dark gap between them, single vertical white-blue beam connecting the floor's activation point to the nucleus — the floor/float/gap/beam requirement that two prior attempts completely missed.
+- Eleven product orbs, correct count, correct colors, correct positions, correct Pro primary+secondary size/proximity hierarchy — matches the brief's exact color list.
+- **Node material fixed** — coherent glowing energy spheres with internal volumetric currents and a hot white core, NOT glass/gem. Verified by tight crop: `01-specs/ecosystem-refs/COMMAND-HUB-v1-node-material-verify-crop.png`. This was the material regression that broke two prior Seedream attempts (`nodes/commandtable-seedream-v1.png` and its predecessor) — fixed this time by explicitly naming and forbidding "faceted cut-gem geometry / jewelry prong mounts / opaque brushed metal housing" in the prompt, not just asking for "not a gem."
+- **Center icon fixed** — clean, legible three-bar Lumin mark, correct proportions, not a crescent/smudge. Verified by tight crop: `01-specs/ecosystem-refs/COMMAND-HUB-v1-icon-verify-crop.png`. Fixed by feeding the flat brand-mark file (`Brand Assets/Logos/lumin_logo_circle_blue_three_i_white_transparent.png`) as a second reference specifically for bar shape, separate from the structural reference image.
+
+**How it was made (reproducible):** ONE Seedream v5 Pro pass, two image references — (1) the approved GPT/Codex command-table structure image for layout/nodes/routing/colors, (2) the flat Lumin icon file for exact bar shape — plus a prompt that explicitly encodes the floor/float composition and forbids the two known failure modes by name. Full prompt saved at `01-specs/ecosystem-refs/command-hub-v1-prompt.txt`. The mirrored variant is a plain local horizontal flip (`PIL Image.transpose(FLIP_LEFT_RIGHT)`) — no regeneration, zero risk to the verified fixes, since the icon is bilaterally symmetric and survives a mirror intact (re-verified by crop after flipping).
+
+## ⚠️ SUPERSEDED — do not resume, kept only as history
 1. **The wireframe HUD sphere** (`public/eco/refs/hud*`, old `MASTER-FINAL.png`). Died after repeated icon-accuracy failures.
-2. **The oblique orbital-beacon system** (`public/eco/nucleus/`, `public/eco/orbital/`). The nucleus (`NUCLEUS-FINAL.png`) and empty scaffold (`SCAFFOLD-FINAL.png`) got locked, but **node placement on that scaffold was rejected twice**: a full-loop-scattered attempt read as "stupid jewels" with zero visible suite grouping; a follow-up fix solved grouping/shape but stripped out all atmosphere/richness, reading as a cheap flat diagram. User's verdict: keep only the floor and the orb's position, reset everything else. Also found: `NUCLEUS-FINAL.png`'s icon bars have no visible rounded tops under close inspection — melted into generic smudges by the exposure treatment. Not fixed before the pivot below happened.
+2. **The oblique orbital-beacon system** (`public/eco/nucleus/`, `public/eco/orbital/`). Nucleus and empty scaffold got locked, but node placement on the scaffold was rejected twice (read as "stupid jewels" / lost all atmosphere). Also had its own unfixed icon defect.
+3. **Command table WITHOUT the floor** (`public/eco/nodes/commandtable-seedream-v1.png` and its GPT source). Correct hub structure, but missing the floor/float composition entirely, plus the gem-material and wrong-icon defects. Directly superseded by the locked master above, which fixes all three at once.
 
-## ✅ CURRENT DIRECTION — the "command table"
-User showed 2 ChatGPT reference images of a **holographic command table**, now saved at:
-`Official Lumin Website Folder/NEW ECO SYSTEM IMAGE REFERENCES/Generated image 1 (30).png` and `(31).png`
-(also `Reimagined Lumin ecosystem structure.png` / `Refined orbital ecosystem.png` — those two are an earlier swirl/galaxy variant the user already rejected; **don't confuse them with the command-table pair**, they look nothing alike.)
-
-**What makes the command table work, per the user and confirmed by direct analysis:**
-- One unified circular platform (isometric view) — not arcs/orbits floating in a void.
-- Every node docked on its own individual pedestal — a literal address, not a point on a line.
-- Suite grouping via BOTH spatial clustering AND physical rectilinear circuit-trace pathways wiring each node back to the core — a traceable connection, not just a thin tether.
-- Pro's main/subordinate hierarchy solved via size + proximity pairing (big node + small node docked beside it) — no separate visual system needed.
-- Reads as a tactical hologram instrument, not a solar system.
-
-**Named flaws in GPT's native render (fix in the Seedream pass, don't just copy blindly):**
-- Too dense — circuit patterning covers nearly the whole platform, no negative space left for future link/copy overlays.
-- Surface quality is plasticky/rough — needs a Seedream light pass for photoreal bloom, material depth, polish.
-- **Watch specifically:** Seedream's extra sparkle/refraction tends to push the node material toward "gem/glass button" — it must read as a coherent power-core light source in a housing, not a jewel. Say this explicitly in the prompt.
-
-## Taxonomy — CONFIRMED FINAL, 11 nodes total (gotten wrong multiple times before, re-verify against `project_lumin_product_taxonomy` memory if in doubt)
-- **Lumin One — 5 main nodes:** Move, Fuel, Market, Station, Studio. Cool spectrum sweep: Supernova blue → Stellar mint → Galaxy lime.
-- **Lumin Pro — 3 main nodes:** Core (a real product, the Mindbody-competitor OS — **NOT the center icon**), Connect, Loops. Aurora violet anchor + Nebula/Flare accents.
-- **Lumin Pro — 3 smaller subordinate nodes:** Academy, Asset Management, Command Center. Docked beside their related main via size+proximity, per the command-table pattern above.
+## Taxonomy — CONFIRMED FINAL, 11 nodes total (re-verify against `project_lumin_product_taxonomy` memory if in doubt)
+- **Lumin One — 5 nodes, equal scale:** Move `#5270FF`, Station `#40DCFF`, Fuel `#00FFBA`, Studio `#5FFF59`, MRKT `#E3FF70`.
+- **Lumin Pro — 3 primary:** Core `#863399` (a real product, the Mindbody-competitor OS — **NOT the center icon**), Connect `#FF5E2E`, Loops `#FF004B`.
+- **Lumin Pro — 3 secondary**, docked beside their primary via size+proximity: Academy `#C59BFF` (near Core), Asset Management `#FF9A70` (near Connect), Command Center `#FF6B93` (near Loops).
 - **Center icon = the neutral Lumin brand mark only**, tied to no single product.
 
-## A Seedream attempt already happened — `public/eco/nodes/commandtable-seedream-v1.png`
-Pipeline: fed GPT's command-table image + the real `public/assets/lumin-icon.png` into a Seedream v5 Pro pass for photoreal polish, kept structure/grouping/hierarchy, thinned density.
-
-**What landed well:** floor reflection is genuinely realistic (real reflective surface, specular reflections of each node's glow — not a flat printed texture). Density fixed — real dark negative space between nodes, circuit pathways still visible. Overall photoreal quality is a real step up. Suite grouping and hierarchy held.
-
-**Two real defects, not yet fixed:**
-1. **Nodes drifted toward "gem" again** — rendering as glass/gem buttons in metal rims, exactly the material regression flagged as a risk going in.
-2. **Center icon is actively wrong, not just unfixed** — it's not the 3-bar mark at all; rendered as some kind of crescent/moon shape. Feeding the real icon file as a reference did not take this time.
-
 ## NEXT (in order, resume here)
-1. **Fix the node material and the center icon** — two isolated passes, don't bundle (see rule below). Node fix: be more explicit/forceful in the prompt about "coherent light in a housing, not glass/gem, no refraction sparkle." Icon fix: consider the nucleus-recipe pattern below (isolate the icon alone, verify by tight crop, then re-composite) rather than trusting one global Seedream pass to get a small detail right inside a large busy frame — that exact failure mode already cost 5+ regenerations once on the sphere-era nucleus.
-2. Once both are clean, get user approval, then this becomes the new master frame.
-3. Regenerate the idle-loop animation from the locked master (Kling 3.0 recipe below is still mechanically valid).
-4. Boot-up bridge clip, per-node focus clips, wire into the ecosystem section — same state-machine architecture as always planned.
+1. **Pick left/right orientation** — original vs. mirrored. User's call, not yet made.
+2. **Extract product-orb screen coordinates** from the locked master (pixel-measure, don't eyeball — same discipline as the icon/material crops) so DOM overlay hit-areas can be positioned. Needed before any click-interaction work.
+3. **Regenerate the idle-loop animation** from the locked master (Kling 3.0 recipe further down is still mechanically valid, art direction changed).
+4. **Transition sequence** — the full narrative in `01-specs/ecosystem-command-hub-brief.md` Part 2: hero resolves to icon → icon descends to floor activation point → rings activate → beam rises → hub assembles → idle. Not yet built. The floor asset referenced there should be confirmed as the same constellation floor already used elsewhere in the site's opening (check `public/frames/transition/` / orb-transition assets from the opening sequence work) rather than a new environment.
+5. Boot-up bridge clip, per-node focus clips, wire into the ecosystem section — same state-machine architecture as always planned.
 
 ## Hard-won rules — still apply, read before generating
-1. **Lock small pieces in isolation before the big scene** where possible. Fixing a small detail (an icon, a node) buried inside a large complex render is slow and unreliable — isolating it first is cheap and fast to verify.
-2. **When fixing any small detail, crop tightly and do a direct pixel-level side-by-side against ground truth before declaring it correct.** Eyeballing a full-width frame has missed real problems more than once; a plain crop-and-compare caught them immediately.
-3. **Verify a "ground truth" reference file is actually still correct before trusting it** — don't assume a file's existence means it's the right version.
-4. **Don't try to fix organic glow/bloom art with manual pixel compositing** (crop+stretch+paste) — produces visibly smeared, distorted results. Regenerating with a precise, correctly-targeted image reference is more reliable.
-5. **Isolate one change per pass** — never bundle multiple new visual ideas into one generation.
-6. **Never lock/save anything as canon without showing the user first and getting explicit approval.**
-7. **The user's real reference screenshots live in a Finder folder outside git:** `Official Lumin Website Folder/NEW ECO SYSTEM IMAGE REFERENCES/` — feed these directly as `--image-references` when the user points at one, rather than only describing them in text. Gotcha: some filenames contain a narrow no-break space (U+202F) instead of a normal space before "PM" — `ls`/hardcoded paths can silently fail to find them; list the directory and substring-match to get the exact filename first.
-8. **Commit and push before ending a session, especially if credits/time are running low.** This file went stale and real generated work sat uncommitted for a full session because that didn't happen — nearly lost.
+1. **"Photoreal" means photoreal LIGHT, not a photoreal solid object.** The single costliest mistake of the whole command-hub saga: asking Seedream for "real anodized metal, physically accurate specular highlights, a housing" turned a hologram into jewelry. If nodes or infrastructure ever drift toward looking like a physical object again, this is almost certainly why — the fix is describing light behavior (bloom, internal volumetric currents, translucency, emission), never surface material properties like metal/gem/glass.
+2. **Lock small pieces in isolation before the big scene**, where possible — but a single well-built prompt that explicitly names and forbids the exact known failure modes CAN solve multiple defects in one pass (this master frame fixed the floor, the material, AND the icon simultaneously, in one generation, once the prompt was precise enough). Isolation is the fallback when a combined attempt fails, not always the mandatory first move.
+3. **When fixing any small detail, crop tightly and do a direct pixel-level side-by-side against ground truth before declaring it correct.** Eyeballing a full-width frame has missed real problems more than once; a plain crop-and-compare caught them immediately every time it mattered.
+4. **A pure geometric transform (flip/crop/resize) done locally costs nothing and risks nothing** — use it instead of regenerating when the change is purely positional (e.g. mirroring left/right) and the content itself doesn't need to change. Re-verify anything content-sensitive (like a logo) survived the transform correctly rather than assuming.
+5. **Never lock/save anything as canon without showing the user first and getting explicit approval.** (This master frame WAS explicitly approved and saved.)
+6. **Commit and push before ending a session, especially if credits/time are running low.** A prior session's work sat uncommitted for a full session and nearly got lost because of this.
+7. **The user's real reference screenshots live in a Finder folder outside git:** `Official Lumin Website Folder/NEW ECO SYSTEM IMAGE REFERENCES/` — feed these directly as `--image-references`, not just described in text.
 
-## Nucleus recipe (repeatable — from the orbital-era nucleus fix; may still be useful for the command-table icon defect)
-```
-# Step 1 — isolated structure, ground-truth icon file as reference, NO scene around it
-higgsfield generate create gpt_image_2 \
-  --prompt "<isolated tight nucleus study: bright white-blue beacon, exact icon silhouette
-  from reference inside it, corona, thin rays, feed-beam rising from below, deep black
-  void, no floor, no rings, no other elements>" \
-  --image-references "public/assets/lumin-icon.png" \
-  --aspect_ratio 1:1 --resolution 2k --wait
-
-# Step 2 — push exposure / refine, one change at a time, verify each with a tight crop
-higgsfield generate create seedream_v5_pro \
-  --prompt "<keep exact composition; ONE targeted change>" \
-  --image "<previous output>" --aspect_ratio 1:1 --resolution 2k --wait
-```
-
-Fuller narrative, the full verbatim creative brief for the orbital era, and all prior superseded history: `../../../CONTEXT.md` §10 (outside the repo) and the local Claude memory `project_lumin_ecosystem_rebuild` + `project_lumin_product_taxonomy`.
+Fuller narrative and all prior superseded history: `../../../CONTEXT.md` §10 (outside the repo) and the local Claude memory `project_lumin_ecosystem_rebuild` + `project_lumin_product_taxonomy`.

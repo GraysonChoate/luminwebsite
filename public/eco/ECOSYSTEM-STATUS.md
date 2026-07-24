@@ -3,10 +3,21 @@
 Cross-account handoff for the Lumin ecosystem visualization. Read this first before touching `public/eco/`.
 
 ## ✅ CURRENT MASTER — the floating command hub, LOCKED and APPROVED
-**`public/eco/hub/COMMAND-HUB-MASTER.png`** — Lumin One (5 nodes) on the viewer's LEFT, Lumin Pro (6 nodes) on the RIGHT.
-**`public/eco/hub/COMMAND-HUB-MIRRORED.png`** — same image, pure horizontal mirror. Lumin Pro on the LEFT, Lumin One on the RIGHT. Both are approved; which one ships is still open — see NEXT below.
+**`public/eco/hub/COMMAND-HUB-MIRRORED.png`** — Lumin Pro (6 nodes) on the viewer's LEFT, Lumin One (5 nodes) on the RIGHT. **This is the actively-maintained orientation** — every fix past the initial lock (orb relocation, uniform sizing, rebalancing) was applied to this one specifically.
+
+**`public/eco/hub/COMMAND-HUB-MASTER.png`** — the ORIGINAL orientation (One left / Pro right). **Stale — has NOT received the fixes below** (still has the old big/small orb hierarchy, Core still sitting rear-left unfixed). If this orientation is wanted again, regenerate it as a pure horizontal mirror of the current `COMMAND-HUB-MIRRORED.png` (the same zero-cost, zero-risk technique used earlier — the icon is bilaterally symmetric and survives a flip intact) rather than resuming edits on the stale file directly.
 
 Both fully satisfy the master brief at `01-specs/ecosystem-command-hub-brief.md` (outside the repo — the two full verbatim spec documents the user wrote: hub/node/nucleus design + page positioning/floor/transition rules). Read that file before generating anything else for this section.
+
+### Fixes applied on top of the initial lock (2026-07-23 night, chronological — full lineage preserved in `01-specs/ecosystem-refs/COMMAND-HUB-MIRRORED-v2-*` and `-v3-*`)
+1. **Core relocated** from a recessed rear-left position onto a specific rail terminus that was dangling with no orb attached (front-left, near the red orb cluster) — not just resized in place, actually moved. Academy (its small companion) moved with it.
+2. **A duplicate stray orb removed** — the relocation edit left a small leftover lavender orb floating alone near Core's old position; deleted, platform surface patched seamlessly.
+3. **All eleven orbs resized to one uniform scale** — the original "3 large primary + 3 small secondary" hierarchy on the Pro side (specified in the original brief) was explicitly overridden by the user: *"every orb should be the same size!!"* This is now the standing rule, superseding that part of the original brief. Orbs un-paired into fully independent nodes, redistributed so Pro's 6 and One's 5 occupy the same overall footprint/reach from the nucleus (Pro's necessarily a bit tighter since it has one more), with matching front-to-back depth variation added to both sides so neither reads as flatter than the other.
+
+**Verified after every single one of the above, by tight crop, not by eyeballing the full frame:** the centre nucleus/icon survived unchanged each time. This mattered — the icon has been the single most fragile element across the whole night's work.
+
+### NEXT — in progress
+**Grow the centre Lumin icon/nucleus slightly larger** — requested, not yet executed. Deliberately queued as its own isolated pass on top of the now-approved rebalanced frame, specifically because the icon is the most fragile element and should never be bundled into the same generation as a structural change. Once done and crop-verified, that becomes the new master.
 
 **What's in the frame, verified:**
 - Command hub floats above a separate constellation floor, real dark gap between them, single vertical white-blue beam connecting the floor's activation point to the nucleus — the floor/float/gap/beam requirement that two prior attempts completely missed.

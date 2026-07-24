@@ -1,0 +1,32 @@
+{
+  "_note": "PROVISIONAL first-pass coordinates read off COMMAND-HUB-FINAL.png (2048x1156) by cropping and measuring. Good enough to plan against; MUST be re-verified precisely before wiring real DOM hit areas. Verify by overlaying markers on the image and checking visually, not by trusting these numbers.",
+  "master": "COMMAND-HUB-FINAL.png",
+  "dimensions": [2048, 1156],
+  "aspect": 1.772,
+  "nucleus": { "xpct": 50.0, "ypct": 41.0, "note": "neutral Lumin brand mark, not a product node" },
+  "floor_activation_point": { "xpct": 50.0, "ypct": 82.0, "note": "beam origin; shares vertical centreline with nucleus" },
+  "left_suite": {
+    "name": "Lumin Pro",
+    "count": 6,
+    "nodes": [
+      { "slot": "upper-inner",  "colour": "violet-purple", "xpct": 33.2, "ypct": 23.0 },
+      { "slot": "upper-mid",    "colour": "salmon-red",    "xpct": 21.8, "ypct": 29.8 },
+      { "slot": "upper-outer",  "colour": "amber-orange",  "xpct": 12.0, "ypct": 36.5 },
+      { "slot": "lower-inner",  "colour": "crimson-red",   "xpct": 23.2, "ypct": 50.8 },
+      { "slot": "lower-outer",  "colour": "magenta-pink",  "xpct": 13.2, "ypct": 58.0 },
+      { "slot": "bottom-inner", "colour": "purple-magenta","xpct": 31.0, "ypct": 65.2 }
+    ]
+  },
+  "right_suite": {
+    "name": "Lumin One",
+    "count": 5,
+    "nodes": [
+      { "slot": "upper-inner",  "colour": "royal-blue",  "xpct": 67.8, "ypct": 21.5 },
+      { "slot": "upper-outer",  "colour": "cyan-blue",   "xpct": 79.8, "ypct": 30.7 },
+      { "slot": "mid-inner",    "colour": "teal",        "xpct": 77.0, "ypct": 48.0 },
+      { "slot": "mid-outer",    "colour": "green",       "xpct": 89.0, "ypct": 56.0 },
+      { "slot": "bottom-inner", "colour": "yellow-lime", "xpct": 66.8, "ypct": 65.2 }
+    ]
+  },
+  "_product_assignment_pending": "Which specific product maps to which colour slot is NOT yet decided. Taxonomy is 11 nodes: Pro = Core, Connect, Loops, Academy, Asset Management, Command Center. One = Move, Fuel, Market, Studio, Station. See project_lumin_product_taxonomy memory."
+}

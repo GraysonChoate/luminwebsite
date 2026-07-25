@@ -199,6 +199,42 @@ Three independent canon sources agree at 55.5–56.2. Frame 1 is nearly 3× furt
 
 **Two known gaps in the storyboard:** no frame shows the briefed "orb energy stretches into filaments" beat, and it sits inside the 3→4 step which carries **43.5% of the entire transformation** with no anchor. And frame 6 still has a vertical light shaft, where the white-void references are horizontal drifting fields with no beam — the light must reorient from *above* to *ahead*.
 
+### ✅ Phase E CLOSED — approved 2026-07-25
+
+`transition-to-void/APPROVED-eco-to-void-6s.mp4` (6.04s). Charge → bolt climbs the stem → strikes the Core → contained electrical discharge through the table → breakout warps the frame → premium white void.
+
+| File | What |
+|---|---|
+| `APPROVED-eco-to-void-6s.mp4` | **canon.** Both pieces, crossfaded, retimed |
+| `piece1-charge-4s.mp4` / `piece2-strike-discharge-void-6s.mp4` | the two generations |
+| `SOURCE-canon-idle-f1.png` | start frame = idle-loop master encode f1 |
+| `JOINT-frame-beam-free.png` | piece 1's last frame = piece 2's start_image |
+| `END-TARGET-from-CTA-1.png` | their CTA-1, cropped 16:9, used as `end_image` |
+| `void-v3-*` | an earlier approved iteration, superseded |
+
+**Seams:** live idle loop → chain start **1.88%** (tighter than canon assets are to each other); piece 1 → piece 2 4.60% under a 0.25s crossfade; chain end → CTA-1 5.31%.
+
+**⚠️ THE TECHNIQUE THAT FINALLY WORKED — split so the second piece cannot see the thing you want gone.**
+The beam above the Core kept returning at the strike across **five** consecutive takes. Prompting failed every time — "nothing rises above the emblem," end_images, retraction language. The cause: the beam is the single strongest feature of the start frame, so whenever the model needed to express energy it reached for it.
+The fix was structural. Generate piece 1 ending on a frame where the feature is already gone, then start piece 2 from **piece 1's actual last frame**. Piece 2's reference simply has no beam to restore. Beam score went 0.96 → 0.20 at mid-charge and stayed 0.29 through the strike *and* the whole discharge. Chaining by extraction also makes the join seamless by construction.
+**Generalise: when a model keeps reinstating something inherited from `start_image`, don't argue with the prompt — re-cut the clip so the offending frame isn't the reference.**
+
+**⚠️ MEASUREMENT — a fifth false alarm, same family as Phase B's phantom 22px.**
+A "beam present?" check that spot-samples three fixed rows reported the beam blazing at 211–255 when it was absent. Two of those rows land exactly on the **horizontal halo arcs** above the emblem. A crossbar lights one row; a beam lights all of them. The working detector requires *consecutive* rows where the centre column is both bright and much brighter than off-centre, calibrated as: canon-with-beam **0.94**, beam-free **0.20–0.29**, none **0.00**. Always calibrate against a known-present and known-absent frame.
+
+**Vocabulary that misfires on this scene:**
+- "recursive crystalline facets / lattice / shards" → renders as a **cluster of glowing bubbles**. Never use.
+- The user's "fractal" means **branching electrical lightning**, not crystal geometry. Say forked, arcing, discharge, branching.
+- Naming the coloured nodes as actors ("the nodes burst into…") makes the model give each one its **own individual performance** — sprays, then vases, then hourglasses, three takes running. Describe only the table as one body and let them be absorbed by omission.
+- "fine glowing fragments" still renders **chunky floating shards**. Say "a mist of light so fine it has no separate pieces."
+- Prohibition overload kills motion, re-confirmed: a prompt loaded with *no sheen / no rim / no base / nothing thrown outward / no push / no orbit* produced a dead brightness ramp with no de-atomization at all. Motion in the body, two lines of locks at the end.
+
+**Structure that made it read right:** the discharge is **contained inside the platform footprint** while it does its work — the table shorting out from within, the surrounding frame still dark — and only *then* bursts past the edge as one wave that sweeps the frame and warps the camera into the white. Collapsing those two stages into one gave frame-wide bolts immediately, which read as "too much."
+
+**Locking the destination beat prompting.** Three takes described the premium void and three returned blank white (structure 2.56–2.77 vs CTA-1's 3.78). Passing their own CTA-1 as `end_image` fixed it in one — final structure 4.52, with real threads and ghost arcs, and it guarantees the handoff into the white-void section.
+
+**Also re-confirmed:** emissive objects only read as emissive against darkness. As the field bleached, the model substituted **specular material** on the node domes — 2041 specular blowouts against the canon's **5** — and they turned into glossy plastic balls. An emissive element must shed specular, rim, base and edge definition at the same rate the background brightens, or be re-conceived as lines and points, which do read on white.
+
 ---
 
 ## ⚠️ SUPERSEDED — kept only as history, do not resume

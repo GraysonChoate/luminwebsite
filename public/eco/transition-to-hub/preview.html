@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hero → Ecosystem Hub transition</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden}
+  video{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
+  .replay{position:fixed;bottom:16px;right:16px;z-index:5;background:#0e1424;color:#8fb4ff;
+    border:1px solid #23304f;border-radius:6px;padding:8px 14px;font:12px ui-sans-serif,system-ui;cursor:pointer}
+</style>
+</head>
+<body>
+<video id="v" autoplay muted playsinline src="hero-to-hub-transition.mp4"></video>
+<button class="replay" onclick="v.currentTime=0;v.play()">Replay</button>
+</body>
+</html>

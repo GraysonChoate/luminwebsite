@@ -1,4 +1,4 @@
-# Ecosystem — build status & handoff (2026-07-24 — IDLE LOOP DONE, Phase A complete)
+# Ecosystem — build status & handoff (2026-07-25 — PHASE B DONE: full hero→idle chain approved)
 
 Cross-account handoff for the Lumin ecosystem visualization. Read this first before touching `public/eco/`.
 
@@ -53,6 +53,58 @@ The architecture is unchanged: **a state machine of pre-rendered clips wearing t
 **The loop seam — confirmed, and solved in the browser, not in ffmpeg.** Even with `start_image == end_image` the clip does not return to its start: the seam measured 1.84 against a 0.72 baseline, and an exhaustive search of every frame in the last 1.4s found nothing better than 1.30. In-file crossfades bottomed out around 1.25. **The fix is `idle-loop.html`:** two copies of the clip, the incoming one restarted on top and faded in over 0.6s.
 
 ⚠️ **The bug to not repeat:** fading *both* layers at once composites to `t·new + (1-t)²·old`, which sums to **0.75 at the midpoint — a visible 25% darkening every single loop.** The user caught it immediately. Only the top layer may animate opacity; the outgoing layer stays fully opaque underneath. Verified back at a flat 1.000 composite weight.
+
+### Phase B — transition chain, hero → idle — ✅ DONE (2026-07-25), user-approved: "spectacular"
+
+**Deliverables in `public/eco/transition-to-hub/`:**
+
+| File | What |
+|---|---|
+| `FULL-CHAIN-hero-to-idle.mp4` | 21.6s — the whole sequence: hero's last frame → orb descends into floor → hub activates → 2× idle loop. Crossfaded at both joins. |
+| `clip1-hero-to-floor-6s.mp4` | **Clip 1**, 6.000s. Hero `f_478` → orb condenses → descends → absorbs into the floor. |
+| `clip2-activation-6s.mp4` | **Clip 2**, 6.04s. Floor → beam → Core → structure → 11 nodes → idle state. |
+| `clip2-activation-10s-master.mp4` | Clip 2 at native 10s before retime. |
+| `clip1-last-frame.png` · `clip2-last-frame.png` · `idle-first-frame.png` | The anchor frames the chain is registered against. |
+
+Prompts + raw collapses archived in `01-specs/ecosystem-refs/` (`clip1-bridge-prompt.txt`, `clip2-collapse-v3-prompt.txt`, `clip2-collapse-v3-raw-10s.mp4`, plus v2 archives).
+
+**Clip 1 build:** the hero's true last frame is `public/frames/journey/desktop/f_478.webp` — NOT the corridor frame an earlier attempt used. A 4s Seedance bridge (`start_image=f_478`, `end_image=` the descent's opening frame) carried the room away and resolved the floor; that was crossfaded into the existing reversed orb-descent footage, then retimed to 6s (bridge 1.12×, descent 2.30×).
+
+**Clip 2 build — THE KEY TECHNIQUE: generate the collapse, then reverse it.**
+`start_image` = idle loop's frame 1 (the hub) · `end_image` = Clip 1's last frame (bare floor) · 10s · reversed · retimed to 6s (1.67×).
+
+#### Why reversal is structurally better, not a workaround
+1. **It puts fidelity where the stakes are.** Models reproduce `start_image` far more faithfully than `end_image`. The hub — 11 nodes, exact colours, exact positions, the icon — is the high-stakes anchor. Making it the START means it comes out clean, and reversing moves that clean frame to the END where it hands off to the idle loop. A forward build would have to invent 11 correctly-coloured nodes at the least reliable moment. **They came through perfect on the first take.**
+2. **It converts an additive prompt into a subtractive one** — the safe direction per rule 7. Nothing is invented; things go dark.
+
+#### Reversal demands two non-obvious things
+- **Beat order AND easing invert.** The fastest beat must sit near the collapse's **END** to read as a snap near the build's **beginning**. Written naturally you'd put the snap first and it lands in the wrong place.
+- **Directional motion is FINE if the reversed direction is the one you want.** Light draining inward along rails reverses into light running outward — exactly the build. Only *absolute*-direction motion breaks (falling debris → rising debris). An earlier pass over-restricted this and lost motion for no reason.
+
+#### The three beats that made it spectacular
+- **Drain along the rails.** Node colour lifts out and runs inward to the Core. Reversed: energy runs outward, arrives, *then* the node ignites — the causal chain becomes visible.
+- **Focus pull.** A projector *resolves*, it doesn't fade. The Core loses focus and blooms before going dark; reversed, the hub **snaps into sharp focus**. Biggest single spectacle win.
+- **Lamp overshoot.** The floor bloom dims, briefly **flares**, then cuts — reversed, that's a real lamp-strike overshoot rather than a dimmer.
+- **Colour withheld.** Structure builds in white-blue with the domes dark; the eleven colours arrive last as the payoff.
+
+#### Sequencing correction (v2 → v3)
+v2 had the upward stream appearing 6 frames BEFORE the Core. User wanted the stream *slightly after* the Core, radiating out of it. Fix: move the stream's retraction EARLIER in the collapse (before the Core's focus loss). v3 measured Core at frame 54, stream at 60 — **+0.25s, correct.**
+
+#### Duration: longer-then-retime IS right for construction — the "longer is worse" rule does not transfer
+Rule 5 was learned on the **idle loop**, where the bottleneck is a fixed *ambient activity* budget, so stretching thins it. A construction sequence has fixed *narrative* to complete, and the failure mode is the model **blending past beats** because there aren't enough frames. Generating 10s and retiming to 6s (1.67×) gave 48% more room per beat. Motion blur artifacts are invisible on this content (pure glowing light, no hard edges) — the descent survived 2.30× cleanly.
+
+#### ⚠️ MEASUREMENT DISCIPLINE — this session's most expensive lesson, four bad metrics
+**Always calibrate a metric on known-identical content before trusting it on unknown content.**
+1. **SSIM is brutal on near-black, thin-bright-line frames.** Two ADJACENT frames of the same clip score only **0.748**. So 0.748 is the practical ceiling, not 1.0 — a raw 0.60 is not the catastrophe it looks like. Calibrate first.
+2. **Tracking a bright centroid is confounded by brightness pulsing.** A brighter core crosses the threshold over more pixels and drags the computed centroid — reported "camera drift" that did not exist. Use **image registration against static structure** instead; it returned exactly (0,0).
+3. **Min/max midpoint of a light spray ≠ its perceptual centre.** This produced a phantom "22px beam misalignment" and a meaningless v2-vs-v3 comparison built on it. Use a **brightness-weighted centroid or the peak column**. Measured properly, the beam sits at x=962 in every clip AND in the idle master — zero axis spread, perfectly straight.
+4. **Brightest-pixel searches grab unrelated star-points.** Constrain the search region.
+
+#### Known cosmetic defect, deliberately deferred
+**The Core sits ~7px left of the beam axis (x≈955 vs x=962).** This is inherited from the approved master and is present in the idle loop identically — it cannot be prompted away, because it enters through `start_image`. It's 0.36% of frame width. **Fix it as one consistent post pass over every clip plus the idle loop, only once the whole chain is locked** — doing it earlier means redoing it after every change.
+
+#### Seams — solved with crossfades, not pixel-exact matching
+Raw seams: Clip1→Clip2 **0.870**, Clip2→idle **0.662** (v3 actually measured worse here than v2's 0.726 — irrelevant once crossfaded). 0.25s crossfades at both joins measured flat frame-to-frame with no spike. Same approach `idle-loop.html` already uses.
 
 ### Phase A.1 — clean-floor master — ✅ DONE, user-approved
 

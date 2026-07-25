@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Lumin Ecosystem — Idle (live preview)</title>
+<style>
+  html,body{margin:0;height:100%;background:#000;overflow:hidden}
+  .lumin-idle{position:relative;width:100%;height:100vh;background:#000;overflow:hidden}
+  .lumin-idle video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:1}
+  .lumin-idle video.fading{transition:opacity var(--fade,600ms) linear}
+</style>
+</head>
+<body>
+
+<div class="lumin-idle" id="idle" style="--fade:600ms">
+  <video class="a" muted playsinline preload="auto" poster="eco-idle-hologram-poster.jpg">
+    <source src="eco-idle-hologram.webm" type="video/webm">
+    <source src="eco-idle-hologram.mp4"  type="video/mp4">
+  </video>
+  <video class="b" muted playsinline preload="auto" style="opacity:0">
+    <source src="eco-idle-hologram.webm" type="video/webm">
+    <source src="eco-idle-hologram.mp4"  type="video/mp4">
+  </video>
+</div>
+
+<script>
+(function(){
+  const FADE = 0.6;
+  const root = document.getElementById('idle');
+  const a = root.querySelector('.a');
+  const b = root.querySelector('.b');
+  let front = a, back = b, armed = false;
+
+  function start(){ if (start.done) return; start.done = true; a.play().catch(()=>{}); }
+  a.addEventListener('canplay', start, {once:true});
+
+  function tick(){
+    const d = front.duration;
+    if (d && front.currentTime >= d - FADE && !armed){
+      armed = true;
+      back.style.zIndex = 2;
+      front.style.zIndex = 1;
+      back.classList.remove('fading');
+      back.style.opacity = 0;
+      back.currentTime = 0;
+      back.play().catch(()=>{});
+      requestAnimationFrame(() => { back.classList.add('fading'); back.style.opacity = 1; });
+      setTimeout(() => {
+        front.pause();
+        front.classList.remove('fading');
+        front.style.opacity = 0;
+        const t = front; front = back; back = t;
+        armed = false;
+      }, FADE*1000);
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

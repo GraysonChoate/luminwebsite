@@ -54,8 +54,19 @@ The architecture is unchanged: **a state machine of pre-rendered clips wearing t
 
 ⚠️ **The bug to not repeat:** fading *both* layers at once composites to `t·new + (1-t)²·old`, which sums to **0.75 at the midpoint — a visible 25% darkening every single loop.** The user caught it immediately. Only the top layer may animate opacity; the outgoing layer stays fully opaque underneath. Verified back at a flat 1.000 composite weight.
 
-### Phase A.1 — clean-floor variant — IN PROGRESS, not yet approved
-The master still has soft colored haze patches on the floor under the orbs. The user flagged them as messy for a build that will carry UI overlays. A subtractive edit removing them (`hologram_v5_cleanfloor.png`, scratch) looked right, but the re-run off it invented UI glyphs above the orbs and was rejected. A further re-run with an explicit marker ban is pending. **`eco-idle-hologram-master.mp4` remains the approved deliverable until something beats it.**
+### Phase A.1 — clean-floor master — ✅ DONE, user-approved
+
+The original master had soft colored haze patches on the floor under the orbs — messy for a build carrying UI overlays. Fixed and re-rendered.
+
+- **New still canon: `COMMAND-HUB-HOLOGRAM-v4-cleanfloor.png`.** Subtractive edit only — the haze erased, floor left clean black, traces and star field untouched. Nothing was added.
+- **New idle master: `eco-idle-hologram-master.mp4`** (re-run off that frame). Measured: motion 0.998 (previous approved 0.706) with structural stability SSIM 0.952 (previous 0.950). More light activity AND a tighter lock than the version it replaces.
+
+**The two failures on the way, and what they teach:**
+
+1. **The scanning and the glyphs come from the same instruction.** Banning "triangulation meshes / lattice nodes / angular fragments" to stop the model drawing brackets above the orbs also deleted the scanning effect that is the best thing in the clip. Do not remove that phrase. **Fence the place, not the effect** — keep the phrase, add that the figures lie flat on the table surface only and never appear near an orb.
+2. **High motion is not automatically good — check it against structural stability.** The rejected take scored 0.827 motion but SSIM 0.780: the model spent its freedom moving the light table, and the user spotted it instantly. The winning take scored 0.998 motion at SSIM 0.952 — light moving, geometry pinned. **Always report both numbers together.** Motion alone is a vanity metric.
+
+`ffmpeg -i first.png -i mid.png -lavfi ssim -f null -` → read `All:`. Below ~0.90 on this scene means the structure moved.
 
 ### Phase B — Boot-up / arrival transition
 Per the brief in `01-specs/ecosystem-command-hub-brief.md` Part 2: hero resolves to the icon → icon descends to the floor's activation point → concentric rings fire outward across the floor → beam rises → hub assembles outward from the nucleus → settles into idle. **Its final frame must be pixel-identical to the idle loop's first frame** or the handoff visibly jumps.

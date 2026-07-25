@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lumin Ecosystem — idle loop</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#000;color:#cfd6e6;min-height:100%;
+    font:13px/1.5 ui-sans-serif,system-ui,-apple-system,sans-serif}
+  .wrap{display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px}
+  .stage{position:relative;width:min(96vw,1500px);aspect-ratio:16/9;background:#000;
+    overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.9)}
+  video,img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  #still{opacity:0;transition:opacity .15s}
+  .panel{width:min(96vw,1500px);display:flex;flex-wrap:wrap;gap:9px 18px;align-items:center;
+    padding:11px 15px;border:1px solid #1c2233;border-radius:8px;background:#0a0d15}
+  h1{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#8fa0c4}
+  label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+  button{background:#141a2a;color:#cfd6e6;border:1px solid #263149;border-radius:5px;
+    padding:5px 11px;font:inherit;cursor:pointer}
+  button:hover{background:#1b2337}
+  button.on{background:#1e3a8a;border-color:#3b5bbf}
+  input[type=checkbox]{accent-color:#5270FF;width:14px;height:14px}
+  .note{width:min(96vw,1500px);font-size:12px;color:#6f7d99;line-height:1.6}
+  .note b{color:#9fb0d4}
+  code{background:#121726;padding:1px 5px;border-radius:3px;color:#a8bce6}
+  table{border-collapse:collapse;font-size:12px;margin-top:6px}
+  td,th{border:1px solid #1c2233;padding:4px 9px;text-align:left}
+  th{color:#8fa0c4;font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="stage">
+    <video id="v" autoplay muted loop playsinline preload="auto"></video>
+    <img id="still" src="COMMAND-HUB-FINAL.png" alt="">
+  </div>
+
+  <div class="panel">
+    <h1>Version</h1>
+    <button id="bNew" class="on">NEW — unison</button>
+    <button id="bOld">OLD — flashing</button>
+    <span style="width:14px"></span>
+    <h1>View</h1>
+    <button id="seam">Jump to seam</button>
+    <button id="slow">½×</button>
+    <button id="norm">1×</button>
+    <label><input type="checkbox" id="ab">Overlay master still</label>
+    <span id="t" style="color:#6f7d99;margin-left:auto"></span>
+  </div>
+
+  <div class="note">
+    <b>The fix:</b> the old version had every node pulsing on its own rhythm — eleven independent lights, which is
+    physically wrong for one projected hologram and read as flashing. A hologram is drawn continuously by one beam from
+    one source, so every element shares one clock. The new version breathes as a single body, with one wavefront
+    expanding outward from the icon.
+    <table>
+      <tr><th>Measured</th><th>Old (flashing)</th><th>New (unison)</th></tr>
+      <tr><td>Global breath swing</td><td>0.0118</td><td><b>0.0610</b> — 5.2× stronger</td></tr>
+      <tr><td>Breath smoothness</td><td>17.1</td><td><b>57.6</b> — 3.4× smoother</td></tr>
+      <tr><td>Radial peak order, inner→outer</td><td><code>[22, 22, 13, 17]</code> incoherent</td><td><code>[3, 11, 23, 41]</code> <b>true outward wave</b></td></tr>
+      <tr><td>Camera drift</td><td>0 px</td><td>0 px</td></tr>
+      <tr><td>Loop wrap vs adjacent frame</td><td>0.60×</td><td>0.33× — seamless</td></tr>
+    </table>
+  </div>
+</div>
+
+<script>
+  const v=document.getElementById('v'), t=document.getElementById('t');
+  const SRC={ new:['eco-idle-unison.webm','eco-idle-unison.mp4'], old:['eco-idle.webm','eco-idle.mp4'] };
+  function load(which){
+    v.innerHTML = SRC[which].map(s=>
+      `<source src="${s}" type="video/${s.endsWith('webm')?'webm':'mp4'}">`).join('');
+    v.load(); v.play();
+    document.getElementById('bNew').classList.toggle('on', which==='new');
+    document.getElementById('bOld').classList.toggle('on', which==='old');
+  }
+  document.getElementById('bNew').onclick=()=>load('new');
+  document.getElementById('bOld').onclick=()=>load('old');
+  document.getElementById('seam').onclick=()=>{ if(v.duration){v.currentTime=Math.max(0,v.duration-0.9);v.play();} };
+  document.getElementById('slow').onclick=()=>v.playbackRate=0.5;
+  document.getElementById('norm').onclick=()=>v.playbackRate=1;
+  document.getElementById('ab').onchange=e=>
+    document.getElementById('still').style.opacity=e.target.checked?1:0;
+  v.addEventListener('timeupdate',()=>{ if(v.duration)
+    t.textContent=v.currentTime.toFixed(2)+' / '+v.duration.toFixed(2)+'s'; });
+  load('new');
+</script>
+</body>
+</html>

@@ -129,8 +129,75 @@ Do not generate 11 focus clips. Instead: brighten the clicked node, dim the rest
 - Zero registration/drift risk
 - Instant response instead of waiting on a clip to play
 
-### Phase D — Wire it up
-Idle video autoplay/muted/loop in the ecosystem section · transparent hit areas at the verified node coordinates · labels and info cards as DOM overlays on top (never baked into the render) · boot-up triggered on scroll-in.
+### ✅ Phase D — Wired into the live scroll (2026-07-25)
+
+`components/sections/EcosystemSequence.tsx` replaces `EcosystemBeat` (the old R3F scene stays in the repo, unmounted). The chain now runs inside the real page.
+
+**The whole chain is ONE frame strip, 289 frames.** `public/frames/descent/` (144, 4.7MB) + `public/frames/activation/` (145, 12MB), concatenated into a single `FrameScrubber`. The activation was originally a played `<video>` — that was wrong, because it left **no frames to run backward**, so scrolling back out could only crossfade. As frames it scrubs identically both directions, and it drops the autoplay-permission problem entirely.
+
+At the gate we don't play a video: we **animate the scroll position** through the activation band at the clip's authored pace (6.0417s linear = its native 24fps) while input is refused. Same choreography, one less layer, and the visitor lands at the *far* side of the band — so backing out costs ~151vh of reverse scrub instead of a 10vh dissolve. That is what anchors them.
+
+Hard lock only for the 6s activation. Escape breaks it, autoplay/cold-video failure releases immediately, 9s hard ceiling. The rest is a soft ~99vh dwell.
+
+**⚠️ THE STICKY-STAGE TRAP — cost two broken builds, read this before touching any section handoff.**
+A full-bleed `position: sticky` stage has **three** scroll landmarks, not one:
+
+```
+REVEAL  = sectionTop - vh     stage starts sliding up into view
+PIN     = sectionTop          it locks to the top
+RELEASE = sectionBottom - vh  it unsticks and slides away
+```
+
+A sticky child of height `vh` in a container of height `H` RELEASES at `containerTop + H - vh` — a full viewport before its own section ends. So the hero's stage unpins while the hero still owns the screen, and the next section's stage doesn't pin until 100vh later: **for one viewport neither is pinned and both frames slide past each other**, giving a hard horizontal content edge and two scenes at once.
+
+`-mt-[100vh]` on the incoming section fixes the PIN — **and silently drags the REVEAL up by the same 100vh**, so the incoming stage starts covering the outgoing scene a full viewport early. One edit, two landmarks moved, second one unnoticed. Both defects were shipped in sequence.
+
+The complete recipe:
+1. `-mt-[100vh]` so incoming PIN == outgoing RELEASE.
+2. Gate the stage on `section.getBoundingClientRect().top <= 0` — hidden through the entire REVEAL→PIN approach.
+3. Gate the **section's own background** with the same predicate, or a coloured rectangle climbs the screen even with the stage hidden.
+4. Drive that gate from a trigger spanning `"top bottom"`→`"bottom top"`. The scrubbed content trigger (`"top top"`→`"bottom bottom"`) **never fires during the approach and cannot see the bug.**
+5. Stay visible past the pin — the RELEASE-side slide-out is the exit, and the background must fill behind the rising stage.
+
+Verified in real Chromium: `GAP = 0px`; stage hidden + background transparent at every approach probe including `stageTop=540`; visible + `#050508` at and after PIN. Seam frames 2px apart are indistinguishable.
+
+**Verification tooling — the in-app preview pane is unusable for scroll work.** It renders white and freezes `requestAnimationFrame` whenever hidden, which stalls Lenis, GSAP and every scroll test. Use Playwright against the installed Chrome instead:
+`executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'` (the cached ms-playwright build is version-mismatched), `waitUntil: 'domcontentloaded'` + a fixed wait — a frame-sequence page never reaches `networkidle`. Neutralise easing with `__lenis.options.lerp = 1` before seeking, or positions drift between calls.
+
+**Measured seams across the whole chain** (calibrated against a within-clip floor of 0.02–0.23%):
+
+| seam | diff | handling |
+|---|---|---|
+| hero f_478 → descent f_001 | 0.32% | hard cut, both near-black |
+| descent f_144 → activation f_001 | 0.68% | hard cut, quieter than the strip's own p95 of 1.38% |
+| activation last → idle f_0 | 3.86% | **600ms dissolve** — the only bright-on-bright join |
+
+**Still open:** snap-to-beats (a fast flick can still cross the activation band before the gate arms); the ecosystem's own RELEASE into ProductStory has the identical un-pinned tail and will show the same defect on the way out; node hit areas; mobile.
+
+### Phase E — Ecosystem → White Void (IN PROGRESS, 2026-07-25)
+
+The hub does **not** power down into the About section. It **blooms out**: pulse climbs the stem → nucleus strike → shockwave ripples outward → bleach to white → cloud void. This supersedes the earlier idea of reusing the un-reversed collapse as the exit.
+
+Storyboard + copy for the whole white void and CTA: `../../../White Void - CTA - Sequence Map.rtf` (18 beats). Frames in `../../../Eco system transition to white void/` (6) and `../../../White Void - CTA - Final/` (12).
+
+**The 6 storyboard frames are structurally faithful but 30% underexposed.** Measured mean luma:
+
+| | luma | Δ from live idle loop |
+|---|---|---|
+| canon idle f0 / activation last / v4 master | 56.2 / 55.5 / 55.7 | — / 3.86% / 2.92% |
+| storyboard 1 / 2 / 3 | **39.0 / 33.5 / 30.6** | **8.54% / 11.14% / 11.78%** |
+
+Three independent canon sources agree at 55.5–56.2. Frame 1 is nearly 3× further from the live idle loop than any real asset, and the drift compounds because each generation fed on the last. Geometry, however, is **intact** — Core centroid 478.6 (canon) vs 480.0 (storyboard), 1.6px apart, with the two canon sources 0.1px apart; platform width within 2px.
+
+*(Care with that measurement: a full-frame column-sum centroid reported a 17px beam shift that does not exist — overall brightness drags it. Constrain to an explicit region. Same trap as the phantom 22px in Phase B.)*
+
+**Therefore:** frame 1 = **our canon hub**, not the storyboard's. Frames 2–3 regenerate from canon (small local beats a model handles cleanly from a correct source). Frames 4–6 keep as **composition targets, not pixel anchors** — by frame 4 luma is 122 and climbing, so the darkening washes out in the bleach. Frame 6 defines the white void's opening frame.
+
+**Generate FORWARD here — deliberately the opposite of Phase B.** There the finished hub had to meet an existing idle loop, so it went on `start_image` and got reversed. Here the hard constraint is at the *start* (frame 1 must match the live loop exactly) and the far end is free, because the white void does not exist yet and will inherit whatever this renders as. Put fidelity on the constrained end.
+
+**Canon rules that govern this clip:** the hub is a hologram — one projector, one clock. It dies by **losing containment and releasing its light**, never by exploding. All eleven nodes stretch on the *same* propagating wavefront (that is one physical event, not the rejected Christmas-lights independence). The bleach follows the wavefront: pearl-white behind it, navy still ahead. The floor doesn't vanish — it *becomes* the cloud deck we then fly over.
+
+**Two known gaps in the storyboard:** no frame shows the briefed "orb energy stretches into filaments" beat, and it sits inside the 3→4 step which carries **43.5% of the entire transformation** with no anchor. And frame 6 still has a vertical light shaft, where the white-void references are horizontal drifting fields with no beam — the light must reorient from *above* to *ahead*.
 
 ---
 

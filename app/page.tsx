@@ -3,7 +3,7 @@ import NavPill from "@/components/NavPill";
 import TraceLayer from "@/components/TraceLayer";
 import NotchDivider from "@/components/ui/NotchDivider";
 import Hero from "@/components/sections/Hero";
-import EcosystemBeat from "@/components/sections/EcosystemBeat";
+import EcosystemSequence from "@/components/sections/EcosystemSequence";
 import ProductStory from "@/components/sections/ProductStory";
 import About from "@/components/sections/About";
 import Contact from "@/components/sections/Contact";
@@ -11,11 +11,13 @@ import Footer from "@/components/sections/Footer";
 
 /**
  * Page flow: the page opens DIRECTLY on the scroll-journey hero (loader
- * covers first-frame decode). The hero's held-black tail flows dark-into-dark
- * into EcosystemBeat (desktop: the R3F ecosystem scene unfolding on scroll;
- * touch/small screens: the classic BrandReveal converge), which notches to
- * the white ProductStory (suite highlight loop) → About → Contact → Footer.
- * WhiteOpening / ThreeIsBanner remain in the repo, unmounted.
+ * covers first-frame decode). The hero's final journey frame IS the first frame
+ * of EcosystemSequence's descent, so the two run as one unbroken shot: the orb
+ * scrubs down into the floor, the activation fires GATED (unskippable), and the
+ * hub settles into its idle loop for a soft dwell. That notches to the white
+ * ProductStory (suite highlight loop) → About → Contact → Footer.
+ * EcosystemBeat (the old R3F scene), WhiteOpening and ThreeIsBanner remain in
+ * the repo, unmounted.
  */
 export default function Home() {
   return (
@@ -25,7 +27,7 @@ export default function Home() {
       <TraceLayer />
       <main>
         <Hero />
-        <EcosystemBeat />
+        <EcosystemSequence />
         <NotchDivider />
         <ProductStory />
         <About />

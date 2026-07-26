@@ -157,3 +157,20 @@ body {
 @media (prefers-reduced-motion: reduce){
   .vs-plane{ opacity:1 !important; transform:translateY(-50%) !important; }
 }
+
+/* ── hero scene links ───────────────────────────────────────────────────
+   The marker fades up as its beat settles. The node keeps a slow pulse so a
+   held scene never reads as a frozen screenshot — it is the only thing moving
+   while the gate waits for the next gesture. */
+@keyframes heroLinkIn {
+  from { opacity: 0; transform: translate(-50%, -50%) translateY(10px); }
+  to   { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+}
+@keyframes heroLinkPulse {
+  0%   { transform: scale(0.55); opacity: 0.95; }
+  70%  { transform: scale(1.9);  opacity: 0; }
+  100% { transform: scale(1.9);  opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="heroLinkIn"] { animation: none !important; opacity: 1 !important; }
+}

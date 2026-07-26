@@ -67,8 +67,19 @@ export default function NavPill() {
 
   const ink = onLight ? "var(--c-cosmos)" : "#fff";
 
+  /** Release every beat gate before navigating.
+   *  This is what makes the nav bar a REAL exit. Gated sections suppress wheel
+   *  and touch and actively pin scroll back to the held beat; without this the
+   *  nav would start a scroll and the still-attached handler would yank it
+   *  straight back — an exit that looks like it works and silently undoes
+   *  itself, which is worse than none. It also replaces the Escape key and the
+   *  timeout ceiling, deliberately: the nav is always on screen, so it is the
+   *  one exit worth trusting. */
+  const releaseGates = () => window.dispatchEvent(new CustomEvent("lumin:releaseGates"));
+
   const go = (anchor: string) => {
     setMenuOpen(false);
+    releaseGates();
     const el = document.querySelector(anchor);
     if (!el) return;
     const lenis = getLenis();
@@ -92,7 +103,7 @@ export default function NavPill() {
           }}
         >
           <button
-            onClick={() => getLenis()?.scrollTo(0)}
+            onClick={() => { releaseGates(); getLenis()?.scrollTo(0); }}
             className="flex items-center gap-2.5"
             aria-label="Lumin — back to top"
           >

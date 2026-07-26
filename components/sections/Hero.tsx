@@ -5,6 +5,7 @@ import { gsap, ScrollTrigger } from "@/lib/motion";
 import { HERO, JOURNEY } from "@/lib/copy";
 import SplitChars from "@/components/ui/SplitChars";
 import FrameScrubber from "@/components/ui/FrameScrubber";
+import { createBeatGate } from "@/lib/beatGate";
 
 /**
  * Cinematic scroll-journey hero — one continuous 7-beat sequence scrubbed by
@@ -26,6 +27,53 @@ const LAST = FRAME_COUNT - 1; // 477 (end of the final "fuel" beat)
 
 const frameUrls = (variant: "desktop" | "mobile") =>
   Array.from({ length: FRAME_COUNT }, (_, i) => `/frames/journey/${variant}/f_${String(i + 1).padStart(3, "0")}.webp`);
+
+/* ── BEAT GATING ──────────────────────────────────────────────────────────
+   The journey used to be a pure scrub, so how many scenes you crossed was
+   decided by how hard you flicked — "too sensitive and its easy to swipe
+   through it". It is now GATED: one gesture = one scene, travelling at the
+   film's authored 24fps, and the page HOLDS on each scene until you ask for
+   the next one. The hold is the point — it is what gives you time to read the
+   caption and click the product link.
+
+   Stops are the MIDPOINT of each beat, not its edges. Every beat ends in a
+   dissolve-to-black seam, so parking on a boundary would park on black; the
+   midpoint is dead centre of the caption's visible window (captions run from
+   0.34 to 0.68 of a beat). Travel therefore carries you through the seams and
+   lands on the money frame. Stop 0 is the opening orb, whose own 300px
+   transition has to clear before the journey is visible — hence the 0.09 floor. */
+const DWELL = JOURNEY.beats.map((b) => (b.frames[0] + b.frames[1]) / 2 / LAST);
+const STOPS = [0, Math.max(DWELL[0], 0.09), ...DWELL.slice(1)];
+/** every hop runs at 24fps — duration is the frame distance, never a guess */
+const DURATIONS = STOPS.slice(0, -1).map((s, i) => ((STOPS[i + 1] - s) * LAST) / 24);
+
+/* ── SCENE LINKS ──────────────────────────────────────────────────────────
+   One product per scene. The seven beats and the consolidated taxonomy happen
+   to be exactly seven things, so this is a clean 1:1 — Lumin One (Move, Fuel,
+   Market) and Lumin Pro (Core, Academy, Connect, Loops).
+
+   Anchors are SOURCE-SPACE coordinates (1920x1080) chosen by scoring each
+   dwell frame's quietest region — low brightness, low variance — so a marker
+   lands in real negative space in that shot rather than floating over the
+   action. They map to screen through the same object-fit:cover transform the
+   footage uses, which is why they stay pinned to the scene at any viewport.
+   Labels flip to the left of the node when the anchor is near the right edge. */
+const SRC_W = 1920, SRC_H = 1080;
+const SCENE_LINKS = [
+  { beat: "check-in",       product: "Core",    x: 1120, y: 405 },
+  { beat: "consultation",   product: "Connect", x: 1740, y: 675 },
+  { beat: "assessment",     product: "Move",    x: 1120, y: 675 },
+  { beat: "training-floor", product: "Loops",   x: 1740, y: 675 },
+  { beat: "station",        product: "Market",  x: 1440, y: 675 },
+  { beat: "studio",         product: "Academy", x: 1740, y: 405 },
+  { beat: "fuel",           product: "Fuel",    x: 1440, y: 675 },
+];
+
+/** map a source-space point to screen, matching object-fit: cover */
+function coverPoint(vw: number, vh: number, sx: number, sy: number) {
+  const scale = Math.max(vw / SRC_W, vh / SRC_H);
+  return { left: (vw - SRC_W * scale) / 2 + sx * scale, top: (vh - SRC_H * scale) / 2 + sy * scale };
+}
 
 /** caption windows in progress space, proportional to beat frame ranges */
 const WINDOWS = JOURNEY.beats.map((b) => {
@@ -59,6 +107,17 @@ export default function Hero() {
   const progressRef = useRef(0);
   const [variant, setVariant] = useState<"desktop" | "mobile">("desktop");
   const [openingDone, setOpeningDone] = useState(false); // orb-emerge loader lifted
+  /** which gate stop we are parked on; -1 while a beat is travelling.
+   *  NOT named `stop` — that resolves to the global `window.stop`. */
+  const [stopIdx, setStopIdx] = useState(0);
+  const [vp, setVp] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const on = () => setVp({ w: window.innerWidth, h: window.innerHeight });
+    on();
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 767px)");
@@ -195,7 +254,20 @@ export default function Hero() {
         section.addEventListener("pointermove", onMove);
       }
     }, section);
+
+    // 4. THE GATE. Mounted after the scrubbed rig above, deliberately: the gate
+    //    animates SCROLL rather than frames, so every rule built above keeps
+    //    driving itself off its own ScrollTrigger with nothing to keep in sync.
+    const gate = createBeatGate({
+      section,
+      stops: STOPS,
+      durations: DURATIONS,
+      onSettle: (i) => setStopIdx(i),
+      onTravel: () => setStopIdx(-1),
+    });
+
     return () => {
+      gate.destroy();
       if (onMove) section.removeEventListener("pointermove", onMove);
       ctx.revert();
     };
@@ -241,6 +313,70 @@ export default function Hero() {
             />
           </div>
         </div>
+        {/* ── SCENE LINKS ────────────────────────────────────────────────
+               One product marker per scene, anchored to a measured quiet spot
+               in that shot. Only the current scene's marker is mounted, and
+               only once the beat has SETTLED — while travelling, `stopIdx` is -1
+               and nothing shows, so a marker never drifts across a moving
+               frame. The hold is unlimited, so there is always time to click. */}
+        {vp.w > 0 && stopIdx >= 1 && SCENE_LINKS[stopIdx - 1] && (() => {
+          const link = SCENE_LINKS[stopIdx - 1];
+          const pt = coverPoint(vp.w, vp.h, link.x, link.y);
+          const flip = link.x > SRC_W * 0.72;   // near the right edge → label inboard
+          return (
+            <div
+              key={link.beat}
+              className="absolute z-[4]"
+              style={{
+                left: pt.left, top: pt.top,
+                transform: "translate(-50%,-50%)",
+                animation: "heroLinkIn 0.7s cubic-bezier(.16,.84,.44,1) both",
+              }}
+            >
+              <a
+                href={`#product-${link.product.toLowerCase()}`}
+                className="group flex items-center gap-3"
+                style={{ flexDirection: flip ? "row-reverse" : "row" }}
+              >
+                {/* the node — same ring language as the launchpad's row dots */}
+                <span className="relative grid h-[13px] w-[13px] shrink-0 place-items-center">
+                  <span
+                    className="absolute inset-0 rounded-full"
+                    style={{ border: "1.5px solid rgba(255,255,255,0.9)" }}
+                  />
+                  <span
+                    className="absolute inset-0 rounded-full"
+                    style={{
+                      background: "var(--c-supernova)",
+                      animation: "heroLinkPulse 2.4s ease-out infinite",
+                    }}
+                  />
+                </span>
+                {/* hairline, drawn from the node toward the label */}
+                <span
+                  className="h-px w-8 shrink-0"
+                  style={{
+                    background: flip
+                      ? "linear-gradient(270deg, rgba(255,255,255,0.85), rgba(255,255,255,0))"
+                      : "linear-gradient(90deg, rgba(255,255,255,0.85), rgba(255,255,255,0))",
+                  }}
+                />
+                <span
+                  className="font-nav whitespace-nowrap rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-white transition-all group-hover:tracking-[0.28em]"
+                  style={{
+                    background: "rgba(10,12,20,0.42)",
+                    border: "1px solid rgba(255,255,255,0.28)",
+                    backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+                    textShadow: "0 1px 14px rgba(0,0,0,0.7)",
+                  }}
+                >
+                  {link.product} by Lumin
+                </span>
+              </a>
+            </div>
+          );
+        })()}
+
         {/* legibility scrim for the lower caption band */}
         <div
           className="pointer-events-none absolute inset-0"

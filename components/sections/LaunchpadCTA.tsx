@@ -110,16 +110,46 @@ function coverRect(vw: number, vh: number, sx: number, sy: number, sw: number, s
   return { left: ox + sx * scale, top: oy + sy * scale, width: sw * scale, height: sh * scale };
 }
 
-type Field = { id: string; label: string; type: string; placeholder: string };
+type Field = {
+  id: string; label: string; type: "text" | "email" | "choice";
+  /** choice fields only */
+  options?: string[];
+  /** choice fields only — more than one answer allowed */
+  multi?: boolean;
+};
 
-/** Five fields. Copy is provisional — the questions and options were never
- *  written, so these are the agreed field names and nothing more. */
+/** Five fields. The last two are pickers rather than free text: nobody types a
+ *  useful answer to "what is your biggest goal", and a fixed set is worth more
+ *  to sales than a text box full of one-word answers.
+ *  Both carry an opt-out as the final option, per the earlier note that the
+ *  harder questions need "something like 'I don't know'". Options are a first
+ *  pass and expected to change. */
 const FIELDS: Field[] = [
-  { id: "name",     label: "Name",              type: "text",  placeholder: "" },
-  { id: "email",    label: "Work email",        type: "email", placeholder: "" },
-  { id: "company",  label: "Company",           type: "text",  placeholder: "" },
-  { id: "biztype",  label: "Business type",     type: "text",  placeholder: "" },
-  { id: "priority", label: "Biggest priority",  type: "text",  placeholder: "" },
+  { id: "name",     label: "Name",         type: "text"  },
+  { id: "email",    label: "Work email",   type: "email" },
+  { id: "company",  label: "Company",      type: "text"  },
+  {
+    id: "biztype", label: "What do you do?", type: "choice",
+    options: [
+      "I run a gym",
+      "I lead group fitness",
+      "I'm a personal trainer",
+      "I work in rehab",
+      "I manage properties",
+      "Something else",
+    ],
+  },
+  {
+    id: "goals", label: "Biggest goals — pick any", type: "choice", multi: true,
+    options: [
+      "Keep members longer",
+      "Grow membership",
+      "Raise coaching quality",
+      "Free up staff time",
+      "Grow revenue per member",
+      "Not sure yet",
+    ],
+  },
 ];
 
 const HEADLINE = "Build the operation you've always wanted.";
@@ -132,7 +162,8 @@ type Phase = "hidden" | "idle" | "launching" | "orbit";
 
 export default function LaunchpadCTA() {
   const [phase, setPhase] = useState<Phase>("hidden");
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [values, setValues] = useState<Record<string, string[]>>({});
+  const [openPicker, setOpenPicker] = useState<string | null>(null);
   const puProgress = useRef(0);          // 0..1 across the power-up strip
   const targetRef = useRef(0);
   const rafRef = useRef(0);
@@ -148,7 +179,7 @@ export default function LaunchpadCTA() {
     return () => window.removeEventListener("resize", on);
   }, []);
 
-  const filled = FIELDS.filter((f) => (values[f.id] ?? "").trim().length > 0).length;
+  const filled = FIELDS.filter((f) => (values[f.id] ?? []).some((v) => v.trim())).length;
   const charged = filled === FIELDS.length;
 
   /* ── take over when the void arrives ─────────────────────────────────── */
@@ -276,7 +307,9 @@ export default function LaunchpadCTA() {
           {FIELDS.map((f, i) => {
             const row = ROWS[i];
             const r = coverRect(vp.w, vp.h, row.x, row.cy - row.h / 2, row.w, row.h);
-            const done = (values[f.id] ?? "").trim().length > 0;
+            const picked = values[f.id] ?? [];
+            const done = picked.some((v) => v.trim());
+            const ink = Math.max(12, r.height * 0.38);
             return (
               <div key={f.id} className="absolute" style={{ left: r.left, top: r.top, width: r.width, height: r.height }}>
                 <span
@@ -285,10 +318,105 @@ export default function LaunchpadCTA() {
                 >
                   {f.label}
                 </span>
+
+                {f.type === "choice" ? (
+                  <>
+                    {/* The row itself is the trigger. The options CANNOT live
+                        inside it — the baked box is one 67px line tall — so they
+                        open as a sheet anchored to the row. */}
+                    <button
+                      type="button"
+                      onClick={() => setOpenPicker((o) => (o === f.id ? null : f.id))}
+                      className="flex h-full w-full items-center justify-between bg-transparent px-4 text-left outline-none"
+                      style={{ color: "var(--c-cosmos)", fontSize: ink }}
+                    >
+                      <span className="truncate">
+                        {done ? picked.join(", ") : ""}
+                      </span>
+                      <span
+                        className="ml-3 shrink-0 transition-transform"
+                        style={{
+                          fontSize: ink * 0.55, opacity: 0.5,
+                          transform: openPicker === f.id ? "rotate(180deg)" : "none",
+                        }}
+                      >
+                        ▾
+                      </span>
+                    </button>
+
+                    {openPicker === f.id && (
+                      <div
+                        className="absolute left-0 z-30 overflow-hidden rounded-[12px]"
+                        style={{
+                          top: r.height + 8, width: r.width,
+                          background: "rgba(255,255,255,0.90)",
+                          backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
+                          border: "1px solid rgba(33,33,33,0.10)",
+                          boxShadow: "0 18px 50px rgba(20,30,60,0.20)",
+                        }}
+                      >
+                        {f.options!.map((opt) => {
+                          const on = picked.includes(opt);
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => {
+                                setValues((v) => {
+                                  const cur = v[f.id] ?? [];
+                                  if (!f.multi) return { ...v, [f.id]: [opt] };
+                                  // the opt-out is exclusive: picking it clears
+                                  // the rest, picking anything else clears it
+                                  const last = f.options![f.options!.length - 1];
+                                  if (opt === last) return { ...v, [f.id]: cur.includes(opt) ? [] : [opt] };
+                                  const next = cur.filter((c) => c !== last);
+                                  return {
+                                    ...v,
+                                    [f.id]: next.includes(opt) ? next.filter((c) => c !== opt) : [...next, opt],
+                                  };
+                                });
+                                if (!f.multi) setOpenPicker(null);
+                              }}
+                              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors"
+                              style={{
+                                fontSize: Math.max(12, ink * 0.82),
+                                color: "var(--c-cosmos)",
+                                background: on ? "rgba(82,112,255,0.12)" : "transparent",
+                              }}
+                            >
+                              <span
+                                className="grid h-[15px] w-[15px] shrink-0 place-items-center rounded-[4px]"
+                                style={{
+                                  border: on ? "none" : "1.5px solid rgba(33,33,33,0.28)",
+                                  background: on ? "var(--c-supernova)" : "transparent",
+                                  color: "#fff", fontSize: 10, lineHeight: 1,
+                                }}
+                              >
+                                {on ? "✓" : ""}
+                              </span>
+                              {opt}
+                            </button>
+                          );
+                        })}
+                        {f.multi && (
+                          <button
+                            type="button"
+                            onClick={() => setOpenPicker(null)}
+                            className="type-eyebrow w-full py-3 text-[10px]"
+                            style={{ color: "#fff", background: "var(--c-supernova)" }}
+                          >
+                            done
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
                 <input
                   type={f.type}
-                  value={values[f.id] ?? ""}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.id]: e.target.value }))}
+                  value={picked[0] ?? ""}
+                  onChange={(e) => setValues((v) => ({ ...v, [f.id]: [e.target.value] }))}
+                  onFocus={() => setOpenPicker(null)}
                   className="h-full w-full bg-transparent px-4 outline-none"
                   style={{
                     // Cosmos on every row, filled or not. The old rule flipped to
@@ -299,11 +427,12 @@ export default function LaunchpadCTA() {
                     // the answer you just typed was the least readable thing on
                     // screen. Ink stays dark; the ROW carries the state.
                     color: "var(--c-cosmos)",
-                    fontSize: Math.max(12, r.height * 0.38),
+                    fontSize: ink,
                     caretColor: "var(--c-supernova)",
                   }}
                   autoComplete="off"
                 />
+                )}
               </div>
             );
           })}

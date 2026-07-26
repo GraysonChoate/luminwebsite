@@ -94,7 +94,15 @@ const HOLD_MS = 700;
 /** the lock can never outlive this, whatever else happens */
 const LOCK_CEILING_MS = 9000;
 
-const CUE = "Scroll to continue the journey";
+/** Idle-state exit controls. Scroll used to be the only way out of the lit hub,
+ *  and backing out meant scrubbing ~151vh of activation in reverse — deliberate
+ *  anchoring, but it made intentional movement feel like forcing the page.
+ *  Buttons replace that: an explicit way forward and an explicit way back.
+ *  LEFT is "go back" and RIGHT is "continue" per direction given. */
+const BACK_LABEL = "Go back";
+const FORWARD_LABEL = "Continue journey";
+/** the embedded link that appears once the orb is at rest in the floor */
+const SUITES_LABEL = "Product Suites";
 
 const SCROLL_KEYS = new Set([
   "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Spacebar",
@@ -115,8 +123,11 @@ export default function EcosystemSequence() {
   const lockedRef = useRef(false);
   const idleLitRef = useRef(false);
   const cueRef = useRef(false);
+  const suitesRef = useRef(false);
 
   const [cueOn, setCueOn] = useState(false);
+  const [suitesOn, setSuitesOn] = useState(false);
+  const navRef = useRef<{ goForward: () => void; goBack: () => void } | null>(null);
 
   useEffect(() => {
     const section = sectionRef.current!;
@@ -132,6 +143,12 @@ export default function EcosystemSequence() {
       if (cueRef.current === on) return;
       cueRef.current = on;
       setCueOn(on);
+    };
+    /** the descent has landed but the activation has not fired yet */
+    const setSuites = (on: boolean) => {
+      if (suitesRef.current === on) return;
+      suitesRef.current = on;
+      setSuitesOn(on);
     };
 
     const blockWheel = (ev: Event) => ev.preventDefault();
@@ -159,6 +176,28 @@ export default function EcosystemSequence() {
         idleBRef.current?.pause();
       }
     }
+
+    /** forward: leave the lit hub for the white void. RELEASE is the last
+     *  scroll position this section owns, so one tween lands us on the void's
+     *  PIN with no reverse scrub in between. */
+    function goForward() {
+      const y = Math.round(section.offsetTop + section.offsetHeight - window.innerHeight);
+      const lenis = getLenis();
+      lenis?.start();
+      lenis ? lenis.scrollTo(y, { duration: 1.1 }) : window.scrollTo({ top: y, behavior: "smooth" });
+    }
+
+    /** back: return to the orb's final resting place in the floor — the last
+     *  descent frame, i.e. the gate position — and hand scroll back so they can
+     *  keep going up under their own power if they want. */
+    function goBack() {
+      const pinned = section.offsetHeight - window.innerHeight;
+      const y = Math.round(section.offsetTop + pinned * GATE_AT);
+      const lenis = getLenis();
+      lenis?.start();
+      lenis ? lenis.scrollTo(y, { duration: 1.4 }) : window.scrollTo({ top: y, behavior: "smooth" });
+    }
+    navRef.current = { goForward, goBack };
 
     function unlock() {
       if (!lockedRef.current) return;
@@ -260,6 +299,7 @@ export default function EcosystemSequence() {
           // The cue belongs to the dwell only — not while they're scrubbing
           // back through the activation, and not once they've acted on it.
           setCue(!lockedRef.current && activatedRef.current && p >= BAND_END - IDLE_FADE && p < BAND_END + 0.06);
+          setSuites(!activatedRef.current && p > GATE_AT * 0.86);
         },
       });
 
@@ -393,17 +433,64 @@ export default function EcosystemSequence() {
           </video>
         </div>
 
-        {/* the exit cue. Scroll stays the way forward, so this reads as an
-            invitation, not an instruction; it appears only once they're free. */}
+        {/* Exit controls, not a scroll hint. They appear only once the
+            activation has finished and the lock is released. */}
         <div
-          className="font-nav pointer-events-none absolute inset-x-0 bottom-10 z-[3] text-center text-[11px] font-semibold uppercase tracking-[0.3em] text-white"
+          className="absolute inset-x-0 bottom-10 z-[3] flex items-center justify-center gap-4 px-6"
           style={{
-            opacity: cueOn ? 0.75 : 0,
+            opacity: cueOn ? 1 : 0,
+            pointerEvents: cueOn ? "auto" : "none",
             transition: "opacity 0.8s ease",
-            textShadow: "0 2px 24px rgba(10,10,15,0.8)",
           }}
         >
-          {CUE}
+          <button
+            type="button"
+            onClick={() => navRef.current?.goBack()}
+            className="font-nav rounded-full px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white transition-colors"
+            style={{
+              background: "rgba(255,255,255,0.07)",
+              border: "1px solid rgba(255,255,255,0.22)",
+              backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
+            }}
+          >
+            {BACK_LABEL}
+          </button>
+          <button
+            type="button"
+            onClick={() => navRef.current?.goForward()}
+            className="font-nav rounded-full px-7 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white transition-transform hover:scale-[1.03]"
+            style={{
+              background: "var(--c-supernova)",
+              boxShadow: "0 0 34px rgba(82,112,255,0.55)",
+            }}
+          >
+            {FORWARD_LABEL}
+          </button>
+        </div>
+
+        {/* "Product Suites" — the embedded link that sits on the plate once the
+            orb is at rest in the floor, before the activation is fired. */}
+        <div
+          className="absolute inset-x-0 z-[3] flex justify-center"
+          style={{
+            bottom: "22%",
+            opacity: suitesOn ? 1 : 0,
+            pointerEvents: suitesOn ? "auto" : "none",
+            transition: "opacity 0.7s ease",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => navRef.current?.goForward()}
+            className="font-nav text-[12px] font-semibold uppercase tracking-[0.3em] text-white"
+            style={{
+              borderBottom: "1px solid rgba(255,255,255,0.5)",
+              paddingBottom: 4,
+              textShadow: "0 2px 24px rgba(10,10,15,0.85)",
+            }}
+          >
+            {SUITES_LABEL}
+          </button>
         </div>
       </div>
     </section>

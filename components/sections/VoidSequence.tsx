@@ -45,7 +45,11 @@ const frameUrls = Array.from(
 const MAPPING_END = 134 / FRAMES; // ≈ 0.229
 
 /* ── COPY ────────────────────────────────────────────────────────────────
-   63 words, six moments. Everything about the cadence is DERIVED: one travel
+   Eight moments. "Let's build it together." was cut on instruction — it also
+   duplicated the CTA headline four seconds later ("Build the operation you've
+   always wanted"). Because the cadence is DERIVED from the slot count rather
+   than hand-placed, removing a line re-spaces the rest automatically.
+   A further cut to five phrases is proposed and awaiting sign-off. Everything about the cadence is DERIVED: one travel
    window for all of them, and the next launches when the previous is 70% of
    the way to the lens, so spacing = 0.7 × window. Hand-placing these is what
    made them bunch at the end and overlap.
@@ -68,8 +72,6 @@ const SLOTS: { side: "L" | "R"; y: number; cls: string; w: number; html: string 
     html: `and started building the system<br>behind every destination.` },
   { side: "R", y: -20, cls: "vs-statement", w: 720,
     html: `What comes next<br>isn't already built.` },
-  { side: "L", y: 150, cls: "vs-step", w: 420,
-    html: `Let's build it together.` },
 ];
 
 /** copy runs between these two points of section progress */

@@ -4,6 +4,7 @@ import TraceLayer from "@/components/TraceLayer";
 import NotchDivider from "@/components/ui/NotchDivider";
 import Hero from "@/components/sections/Hero";
 import EcosystemSequence from "@/components/sections/EcosystemSequence";
+import VoidSequence from "@/components/sections/VoidSequence";
 import ProductStory from "@/components/sections/ProductStory";
 import About from "@/components/sections/About";
 import Contact from "@/components/sections/Contact";
@@ -28,6 +29,7 @@ export default function Home() {
       <main>
         <Hero />
         <EcosystemSequence />
+        <VoidSequence />
         <NotchDivider />
         <ProductStory />
         <About />

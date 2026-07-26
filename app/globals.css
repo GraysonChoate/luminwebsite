@@ -137,3 +137,23 @@ body {
     );
   }
 }
+
+/* ── White Void copy planes ──────────────────────────────────────────────
+   Real type in a CSS 3D space. Left/right of frame only — the centre is the
+   architecture's. Each plane travels toward the lens and fades AS it arrives.  */
+.vs-plane{
+  position:absolute; top:50%; transform-style:preserve-3d;
+  will-change:transform,opacity; opacity:0; color:var(--c-cosmos);
+  font-family:var(--font-heebo), sans-serif;
+}
+.vs-L{ left:6vw }
+.vs-R{ right:6vw; text-align:right }
+.vs-statement{ font-size:clamp(30px,4.1vw,74px); line-height:1.02;
+               letter-spacing:-0.045em; font-weight:500 }
+.vs-step{ font-size:clamp(18px,1.9vw,33px); line-height:1.22;
+          letter-spacing:-0.018em; font-weight:500; color:#5a5a60 }
+
+/* reduced motion: no travel, no perspective — copy simply holds, stacked */
+@media (prefers-reduced-motion: reduce){
+  .vs-plane{ opacity:1 !important; transform:translateY(-50%) !important; }
+}

@@ -5,6 +5,7 @@ import NotchDivider from "@/components/ui/NotchDivider";
 import Hero from "@/components/sections/Hero";
 import EcosystemSequence from "@/components/sections/EcosystemSequence";
 import VoidSequence from "@/components/sections/VoidSequence";
+import LaunchpadCTA from "@/components/sections/LaunchpadCTA";
 import ProductStory from "@/components/sections/ProductStory";
 import About from "@/components/sections/About";
 import Contact from "@/components/sections/Contact";
@@ -36,6 +37,7 @@ export default function Home() {
         <NotchDivider color="var(--c-light)" bg="var(--c-cosmos)" />
         <Contact />
       </main>
+      <LaunchpadCTA />
       <Footer />
     </>
   );

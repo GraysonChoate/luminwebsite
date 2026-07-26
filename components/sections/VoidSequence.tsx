@@ -78,6 +78,22 @@ const GAP = (LAST - FIRST) / (SLOTS.length - 1);
 const W = GAP / 0.7;
 const Z_FAR = -3400;
 
+/* ── SNAP TO THE BEATS ────────────────────────────────────────────────────
+   Reading speed is the hard wall on this section: ~180wpm means the 63 words
+   need real seconds, and free scrolling lets a visitor flick through all of it
+   in under two. So the scroll settles on beats instead of anywhere.
+   A plane ARRIVES at the lens at p = FIRST + i × GAP (that's t = 0 in the
+   travel maths below), so those nine values are the beats — derived from the
+   same cadence that positions the copy, never hand-listed, or the two drift
+   apart the moment the copy changes. Plus the end of the mapping transition
+   and both ends of the section, so neither edge is a half-state. */
+const BEATS = Array.from(new Set([
+  0,
+  MAPPING_END,
+  ...SLOTS.map((_, i) => FIRST + i * GAP),
+  1,
+])).sort((a, b) => a - b);
+
 const c01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 export default function VoidSequence() {
@@ -137,6 +153,19 @@ export default function VoidSequence() {
         start: "top top",
         end: "bottom bottom",
         scrub: 0.6,
+        // settle onto the nearest beat once the wheel goes quiet. `delay` has
+        // to outlast Lenis's own glide or the snap fights the easing and the
+        // frame strip judders; directional:false so scrolling back up settles
+        // just as cleanly as coming down.
+        snap: reduced ? undefined : {
+          snapTo: (value) =>
+            BEATS.reduce((best, b) =>
+              Math.abs(b - value) < Math.abs(best - value) ? b : best, BEATS[0]),
+          duration: { min: 0.25, max: 0.7 },
+          delay: 0.12,
+          ease: "power2.inOut",
+          directional: false,
+        },
         onUpdate: (self) => {
           const p = self.progress;
           frameProgress.current = p;
@@ -150,7 +179,14 @@ export default function VoidSequence() {
             const tt = c01((t + 1) / 1.22) * 1.22 - 1;
             const z = tt < 0 ? Z_FAR * Math.pow(-tt, 1.5) : 0;
             const fadeIn = c01((tt + 1) / 0.5);
-            const fadeOut = c01((0.1 - tt) / 0.22);
+            // Full opacity AT the lens, and the fade starts there — not before.
+            // The old envelope was c01((0.1 - tt) / 0.22), which is already 55%
+            // faded by arrival (tt = 0), so every line peaked at 0.46 and
+            // composited toward the haze: measured 2.0-2.6:1 against a
+            // background of 181-246 luminance, i.e. washed out at the exact
+            // moment it is meant to be read. Landing on 1.0 puts the statements
+            // near 10:1 and the steps near 6:1 with no colour or layout change.
+            const fadeOut = c01((0.22 - tt) / 0.22);
             el.style.opacity = (fadeIn * fadeOut).toFixed(3);
             el.style.transform =
               `translateY(calc(-50% + ${m.y}px)) translateZ(${z}px)`;

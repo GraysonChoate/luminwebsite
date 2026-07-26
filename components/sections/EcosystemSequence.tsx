@@ -55,7 +55,9 @@ import FrameScrubber from "@/components/ui/FrameScrubber";
  * ── ANCHORING ────────────────────────────────────────────────────────────
  * That landing is what anchors them. Backing out of the lit hub means
  * scrubbing ~151vh of activation in reverse, so a flick can't dump you back
- * into the gym. Forward is a soft ~99vh dwell they can leave whenever. The
+ * into the gym. Forward is a short ~25vh dwell and then they are gone — scroll
+ * activates the beat and they have to watch it, but it never becomes a wall
+ * they have to grind through afterwards. The
  * hard lock exists only for the 6s activation — a beat, not a trap: Escape
  * breaks it, and a hard ceiling guarantees it cannot outlive the clip.
  */
@@ -70,14 +72,23 @@ const chainUrls = [
   ...Array.from({ length: ACTIVATION_FRAMES }, (_, i) => `/frames/activation/f_${String(i + 1).padStart(3, "0")}.webp`),
 ];
 
-/** section progress at which the frame strip is exhausted; the rest is dwell */
-const BAND_END = 0.7525;
+/** section progress at which the frame strip is exhausted; the rest is dwell.
+ *  ── SIZED SO THE DWELL ISN'T A WALL ──────────────────────────────────────
+ *  The strip is worth 301vh of scroll (289 frames). The section used to be
+ *  500vh, i.e. a 400vh pinned span, which left 0.2475 × 400 = 99vh of dwell —
+ *  a FULL VIEWPORT of scrolling after the last frame where nothing changes.
+ *  That reads as being stuck against the animation rather than passing it.
+ *  At 426vh the pinned span is 326vh: the strip still gets its same 301vh, so
+ *  the descent, the gated activation and the reverse-out all scrub at exactly
+ *  the rate they were approved at, and the dead tail drops to ~25vh. Change
+ *  the section height and this fraction together, or the pacing moves. */
+const BAND_END = 301 / 326; // ≈ 0.9233 of a 326vh pinned span
 /** section progress where the descent ends and the activation begins */
 const GATE_AT = ((DESCENT_FRAMES - 1) / LAST) * BAND_END; // ≈ 0.3736
 /** the activation's authored length — the gated scroll takes exactly this long */
 const ACTIVATION_S = 6.0417;
 /** scroll span over which the living hub dissolves in/out of the last frame */
-const IDLE_FADE = 0.038; // ≈ 15vh — a dissolve in both directions
+const IDLE_FADE = 15 / 326; // ≈ 15vh — a dissolve in both directions
 /** post-activation hold so the release doesn't feel abrupt */
 const HOLD_MS = 700;
 /** the lock can never outlive this, whatever else happens */
@@ -336,7 +347,7 @@ export default function EcosystemSequence() {
     // children, which share the root stacking context.
     <section
       ref={sectionRef}
-      className="relative isolate z-10 -mt-[100vh] h-[500vh]"
+      className="relative isolate z-10 -mt-[100vh] h-[426vh]"
       // both start invisible: at load we are in the approach, and paintStage
       // arms them the moment the section pins. See the header note.
       style={{ background: "transparent" }}

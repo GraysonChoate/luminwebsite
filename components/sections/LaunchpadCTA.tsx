@@ -33,7 +33,9 @@ import FrameScrubber from "@/components/ui/FrameScrubber";
  * slide off it. Do not replace those clips with anything that moves.
  *
  * ── AFTER SUBMIT, NOTHING IS INTERACTIVE ─────────────────────────────────
- * discharge → bridge → launch play as authored video, back to back, ~31s.
+ * One 31s file: discharge → bridge → launch, pre-joined at build time rather
+ * than chained across three <video> elements. Chaining would put a decode gap
+ * at each handoff and the seams here are 3-5%, which a gap would expose.
  * The visitor is a passenger. It resolves into orbit, where Omeed's welcome
  * film and the scheduler live in the empty left/centre of frame — the
  * storyboard reserved that space deliberately (beat 18: "Earth occupies only
@@ -52,22 +54,28 @@ const puUrls = Array.from(
    where those rows land on screen depends on the viewport's aspect — which
    means the inputs cannot be positioned in vw/%. They have to be mapped
    through the same cover transform the browser applies to the video.
-   Row 1 centre y=303, pitch 102.5, rows start x=362, usable width 578. */
+   Every row carries its OWN x and width. A single shared x/width shipped once
+   and put the button 100px past the panel's right edge: rows 1-3 live inside a
+   nested card and are inset, rows 4-6 sit on the outer panel, and the panel is
+   in perspective on top of that. The numbers below were read off frame 001 of
+   the power-up strip (clean outlines, before any glow bleeds over the edges) —
+   measure on a lit frame and the glow adds 100+px of phantom width. */
 const SRC_W = 1920, SRC_H = 1080;
 
-/** Row rects in SOURCE pixels, measured off the render frame by frame. There is
- *  no pitch formula — the panel sits in perspective, so rows get taller and
- *  further apart toward the bottom (heights 54 → 64). Five rows, because the
- *  power-up clip lights exactly five before it lights the button. */
+/** Row rects in SOURCE pixels. No pitch formula and no shared column: the
+ *  inner card holds rows 1-3 (x=360 w=449), the outer panel holds rows 4-5
+ *  (x=334 w=507), and heights grow 59 → 67 down the perspective.
+ *  FIVE rows — the same five the power-up clip lights before it lights the
+ *  button. The render also bakes a sixth box at {x:334, w:507, cy:803, h:68};
+ *  it is deliberately unused and never lights, so leave it alone. */
 const ROWS = [
-  { cy: 303, h: 54 },
-  { cy: 400, h: 56 },
-  { cy: 500, h: 61 },
-  { cy: 628, h: 64 },
-  { cy: 718, h: 64 },
+  { x: 360, w: 449, cy: 300, h: 59 },
+  { x: 360, w: 449, cy: 398, h: 59 },
+  { x: 360, w: 449, cy: 495, h: 59 },
+  { x: 334, w: 507, cy: 626, h: 68 },
+  { x: 334, w: 507, cy: 714, h: 67 },
 ];
-const BTN = { cy: 894, h: 72 };
-const ROW_X = 362, ROW_W = 578;
+const BTN = { x: 330, w: 511, cy: 889, h: 71 };
 
 /** map a source-space rect to screen, matching object-fit: cover */
 function coverRect(vw: number, vh: number, sx: number, sy: number, sw: number, sh: number) {
@@ -79,7 +87,7 @@ function coverRect(vw: number, vh: number, sx: number, sy: number, sw: number, s
 
 type Field = { id: string; label: string; type: string; placeholder: string };
 
-/** Six fields. Copy is provisional — the questions and options were never
+/** Five fields. Copy is provisional — the questions and options were never
  *  written, so these are the agreed field names and nothing more. */
 const FIELDS: Field[] = [
   { id: "name",     label: "Name",              type: "text",  placeholder: "" },
@@ -232,7 +240,7 @@ export default function LaunchpadCTA() {
           className="pointer-events-none absolute inset-0 h-full w-full object-cover"
           onEnded={() => setPhase("orbit")}
         >
-          <source src="/void/cta/APPROVED-LAUNCH-21s.mp4" type="video/mp4" />
+          <source src="/void/cta/APPROVED-POSTSUBMIT-31s.mp4" type="video/mp4" />
         </video>
       )}
 
@@ -242,7 +250,7 @@ export default function LaunchpadCTA() {
         <form onSubmit={submit} className="absolute inset-0 z-20">
           {FIELDS.map((f, i) => {
             const row = ROWS[i];
-            const r = coverRect(vp.w, vp.h, ROW_X, row.cy - row.h / 2, ROW_W, row.h);
+            const r = coverRect(vp.w, vp.h, row.x, row.cy - row.h / 2, row.w, row.h);
             const done = (values[f.id] ?? "").trim().length > 0;
             return (
               <div key={f.id} className="absolute" style={{ left: r.left, top: r.top, width: r.width, height: r.height }}>
@@ -269,7 +277,7 @@ export default function LaunchpadCTA() {
             );
           })}
           {(() => {
-            const r = coverRect(vp.w, vp.h, ROW_X, BTN.cy - BTN.h / 2, ROW_W, BTN.h);
+            const r = coverRect(vp.w, vp.h, BTN.x, BTN.cy - BTN.h / 2, BTN.w, BTN.h);
             return (
               <button
                 type="submit"
@@ -300,13 +308,17 @@ export default function LaunchpadCTA() {
         </div>
       )}
 
-      {/* ── orbit: the welcome film and the scheduler live in the empty
-             left/centre that beat 18 reserved for them ────────────────── */}
+      {/* ── orbit ─────────────────────────────────────────────────────────
+             Two different jobs, so two different anchors. The welcome film
+             holds the empty left that beat 18 reserved for it. The scheduler
+             goes TOP RIGHT, in the band of clean sky above Earth's limb —
+             Earth only ever occupies the bottom-right, so that corner is free,
+             and the booking step earns the strongest position on screen. */}
       {phase === "orbit" && (
-        <div className="absolute inset-y-0 left-0 z-20 flex w-[58vw] items-center justify-center">
-          <div className="w-[min(46vw,680px)]">
+        <>
+          <div className="absolute inset-y-0 left-0 z-20 flex w-[52vw] items-center justify-center">
             <div
-              className="mb-6 flex aspect-video items-center justify-center rounded-[22px] border"
+              className="flex aspect-video w-[min(44vw,660px)] items-center justify-center rounded-[22px] border"
               style={{
                 borderColor: "rgba(255,255,255,0.22)",
                 background: "rgba(255,255,255,0.05)",
@@ -315,14 +327,20 @@ export default function LaunchpadCTA() {
             >
               <span className="type-eyebrow text-white/45">welcome film</span>
             </div>
+          </div>
+          <div className="absolute right-[5vw] top-[14vh] z-20 w-[min(30vw,430px)]">
             <div
-              className="flex h-[120px] items-center justify-center rounded-[18px] border"
-              style={{ borderColor: "rgba(255,255,255,0.22)", background: "rgba(255,255,255,0.05)" }}
+              className="flex h-[132px] items-center justify-center rounded-[18px] border"
+              style={{
+                borderColor: "rgba(255,255,255,0.26)",
+                background: "rgba(255,255,255,0.06)",
+                backdropFilter: "blur(3px)",
+              }}
             >
-              <span className="type-eyebrow text-white/45">schedule a call</span>
+              <span className="type-eyebrow text-white/55">schedule a call</span>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { gsap, ScrollTrigger } from "@/lib/motion";
 import FrameScrubber from "@/components/ui/FrameScrubber";
+import { createScrubCatch } from "@/lib/beatGate";
 
 /**
  * The White Void — the last scrollable section of the site.
@@ -51,34 +52,34 @@ const proxyUrls = Array.from(
 const MAPPING_END = 134 / FRAMES; // ≈ 0.229
 
 /* ── COPY ────────────────────────────────────────────────────────────────
-   Eight moments. "Let's build it together." was cut on instruction — it also
-   duplicated the CTA headline four seconds later ("Build the operation you've
-   always wanted"). Because the cadence is DERIVED from the slot count rather
-   than hand-placed, removing a line re-spaces the rest automatically.
-   A further cut to five phrases is proposed and awaiting sign-off. Everything about the cadence is DERIVED: one travel
-   window for all of them, and the next launches when the previous is 70% of
-   the way to the lens, so spacing = 0.7 × window. Hand-placing these is what
-   made them bunch at the end and overlap.
-   Sides strictly alternate, so anything on the same side is two slots apart
-   and cannot collide. Each plane fades AS IT ARRIVES — nothing sweeps past. */
-const SLOTS: { side: "L" | "R"; y: number; cls: string; w: number; html: string }[] = [
-  { side: "L", y: 20, cls: "vs-statement", w: 760,
-    html: `Fitness has spent 30&nbsp;years<br>reaching the same 20%.` },
-  { side: "R", y: -170, cls: "vs-step", w: 500,
-    html: `The problem was never proving<br>that movement works.` },
-  { side: "L", y: 70, cls: "vs-statement", w: 780,
-    html: `It was making people<br>want to return.` },
-  { side: "R", y: 0, cls: "vs-statement", w: 640,
-    html: `Intelligent.<br>Interactive.<br>Individualized.` },
-  { side: "L", y: 40, cls: "vs-statement", w: 620,
-    html: `Then we built a place<br>to prove it.` },
-  { side: "R", y: -150, cls: "vs-step", w: 470,
-    html: `So we stopped building<br>one destination —` },
-  { side: "L", y: 60, cls: "vs-statement", w: 800,
-    html: `and started building the system<br>behind every destination.` },
-  { side: "R", y: -20, cls: "vs-statement", w: 720,
-    html: `What comes next<br>isn't already built.` },
+   FIVE phrases. Nine was unreadable at any scroll speed — the arithmetic is
+   brutal: ~180wpm means twenty seconds buys about sixty words, and no scroll
+   engineering gets around it.
+
+   The arc: the problem → who we are → the insight → what we built → the hand
+   to the CTA. Line 2 is the one that earns the rest; we lived this, so line 3
+   is a fact rather than a claim. Line 5 hands off to the Launchpad headline
+   ("Build the operation you've always wanted") without repeating it.
+
+   EVERY LINE ARRIVES THE SAME WAY. Same type size, same vertical landing, same
+   travel — only the side alternates. Previously the y offsets ran 20/-170/70/
+   0/40/-150/60/-20/150 and the sizes mixed statement with step, so each line
+   landed somewhere different at a different scale; a smaller line at the lens
+   READS as further away even though it is at exactly the same depth. That is
+   what made the rhythm feel arbitrary. One landing, one size, one path. */
+const SLOTS: { side: "L" | "R"; html: string }[] = [
+  { side: "L", html: `Fitness has spent 30&nbsp;years<br>reaching the same 20%.` },
+  { side: "R", html: `We didn't study the problem.<br>We ran the floor.` },
+  { side: "L", html: `The workout was never<br>the hard part. Coming back was.` },
+  { side: "R", html: `So we built the system<br>behind every destination.` },
+  { side: "L", html: `Now come build yours.` },
 ];
+/** one width for all of them, wide enough for the longest line at full size so
+ *  nothing wraps into a third line and collides with its neighbour */
+const PLANE_W = 1000;
+/** one landing for all of them: just below centre, over the floor rather than
+ *  the bright upper haze where dark type washes out */
+const PLANE_Y = 60;
 
 /** copy runs between these two points of section progress */
 const FIRST = 0.30, LAST = 0.94;
@@ -86,21 +87,13 @@ const GAP = (LAST - FIRST) / (SLOTS.length - 1);
 const W = GAP / 0.7;
 const Z_FAR = -3400;
 
-/* ── SNAP TO THE BEATS ────────────────────────────────────────────────────
-   Reading speed is the hard wall on this section: ~180wpm means the 63 words
-   need real seconds, and free scrolling lets a visitor flick through all of it
-   in under two. So the scroll settles on beats instead of anywhere.
-   A plane ARRIVES at the lens at p = FIRST + i × GAP (that's t = 0 in the
-   travel maths below), so those nine values are the beats — derived from the
-   same cadence that positions the copy, never hand-listed, or the two drift
-   apart the moment the copy changes. Plus the end of the mapping transition
-   and both ends of the section, so neither edge is a half-state. */
-const BEATS = Array.from(new Set([
-  0,
-  MAPPING_END,
-  ...SLOTS.map((_, i) => FIRST + i * GAP),
-  1,
-])).sort((a, b) => a - b);
+/** Each line ARRIVES at the lens at these points, and the scroll is caught on
+ *  every one — the same mechanic as the journey. Free scrolling let a single
+ *  flick carry the whole void past in about two seconds; snapping did not fix
+ *  it because snapping only settles AFTER you stop pushing. A catch holds the
+ *  line at the lens until you ask for the next one, which is the only thing
+ *  that actually guarantees it gets read. */
+const ANCHORS = SLOTS.map((_, i) => FIRST + i * GAP);
 
 const c01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -124,8 +117,8 @@ export default function VoidSequence() {
     // build the copy planes once
     const planes = SLOTS.map((s) => {
       const el = document.createElement("div");
-      el.className = `vs-plane ${s.side === "L" ? "vs-L" : "vs-R"} ${s.cls}`;
-      el.style.width = `${s.w}px`;
+      el.className = `vs-plane ${s.side === "L" ? "vs-L" : "vs-R"} vs-statement`;
+      el.style.width = `${PLANE_W}px`;
       el.innerHTML = s.html;
       space.appendChild(el);
       return el;
@@ -147,6 +140,8 @@ export default function VoidSequence() {
       section.style.pointerEvents = armed ? "auto" : "none";
     }
 
+    let catcher: ReturnType<typeof createScrubCatch> | null = null;
+
     const ctx = gsap.context(() => {
       // 0. entry guard — spans the whole time the section touches the viewport,
       //    so it sees the approach that the scrubbed trigger never fires during.
@@ -166,25 +161,12 @@ export default function VoidSequence() {
         start: "top top",
         end: "bottom bottom",
         scrub: 0.6,
-        // settle onto the nearest beat once the wheel goes quiet. `delay` has
-        // to outlast Lenis's own glide or the snap fights the easing and the
-        // frame strip judders; directional:false so scrolling back up settles
-        // just as cleanly as coming down.
-        snap: reduced ? undefined : {
-          snapTo: (value) =>
-            BEATS.reduce((best, b) =>
-              Math.abs(b - value) < Math.abs(best - value) ? b : best, BEATS[0]),
-          duration: { min: 0.25, max: 0.7 },
-          delay: 0.12,
-          ease: "power2.inOut",
-          directional: false,
-        },
         onUpdate: (self) => {
           const p = self.progress;
           frameProgress.current = p;
 
           if (reduced) return; // planes stay put; see the CSS fallback
-          SLOTS.forEach((m, i) => {
+          SLOTS.forEach((_m, i) => {
             const el = planes[i];
             const at = FIRST + i * GAP;
             const t = (p - at) / W; // -1 far, 0 arrived
@@ -202,12 +184,20 @@ export default function VoidSequence() {
             const fadeOut = c01((0.22 - tt) / 0.22);
             el.style.opacity = (fadeIn * fadeOut).toFixed(3);
             el.style.transform =
-              `translateY(calc(-50% + ${m.y}px)) translateZ(${z}px)`;
+              `translateY(calc(-50% + ${PLANE_Y}px)) translateZ(${z}px)`;
           });
         },
       });
 
-      // 2. arrival — scroll's last job on this site. Hand off to the CTA.
+      // 2. hold on every line, so none of it can be flicked past
+      catcher = createScrubCatch({
+        section,
+        anchors: ANCHORS,
+        onCatch: () => {},
+        onRelease: () => {},
+      });
+
+      // 3. arrival — scroll's last job on this site. Hand off to the CTA.
       ScrollTrigger.create({
         trigger: section,
         start: "bottom bottom",
@@ -220,7 +210,7 @@ export default function VoidSequence() {
       });
     }, section);
 
-    return () => { ctx.revert(); planes.forEach((p) => p.remove()); };
+    return () => { catcher?.destroy(); ctx.revert(); planes.forEach((p) => p.remove()); };
   }, [reduced]);
 
   return (

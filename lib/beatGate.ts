@@ -316,7 +316,14 @@ export function createScrubCatch({
   function grab(i: number) {
     held = i;
     pinnedTo = yFor(anchors[i]);
-    getLenis()?.stop();
+    const lenis = getLenis();
+    // Resync BEFORE stopping. Lenis keeps whatever target it was animating
+    // toward, and stop() does not clear it — so a catch made during a big jump
+    // (the last anchor, swept up on the way out) was immediately dragged back
+    // out by the stale target and the callout flashed for 0.0s. Measured on
+    // keyboard input: Market appeared and vanished inside one frame.
+    lenis?.scrollTo(pinnedTo, { immediate: true, force: true });
+    lenis?.stop();
     window.scrollTo(0, pinnedTo);
     ScrollTrigger.update();
     window.addEventListener("wheel", block, { passive: false });
@@ -381,7 +388,12 @@ export function createScrubCatch({
     // on keyboard input: Market missed every run. Sweep on the way out and
     // catch anything that was jumped over; grab() snaps back to it.
     onLeave: () => {
-      if (held >= 0) { letGo(); return; }
+      // While a catch is held the scroll is PINNED inside the section, so a
+      // "leave" here is stale bookkeeping, not the visitor going anywhere.
+      // Releasing on it undid the sweep the instant it fired — the last
+      // product appeared and vanished within one frame (measured 0.0-0.1s on
+      // keyboard). The only way out of a held catch is a real gesture.
+      if (held >= 0) return;
       for (let i = 0; i < anchors.length; i++) {
         if (!done.has(i) && anchors[i] > last) { last = anchors[i]; grab(i); return; }
       }

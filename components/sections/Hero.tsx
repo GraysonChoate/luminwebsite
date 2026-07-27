@@ -42,47 +42,55 @@ const frameUrls = (variant: "desktop" | "mobile") =>
    0.34 to 0.68 of a beat). Travel therefore carries you through the seams and
    lands on the money frame. Stop 0 is the opening orb, whose own 300px
    transition has to clear before the journey is visible — hence the 0.09 floor. */
-/** SCENE DWELL FRAMES, read off the footage rather than off JOURNEY.beats.
- *  The seams were found by luminance (every scene ends in a dissolve to black,
- *  mean < 26): 1-17, 66-81, 133-155, 201-216, 265-285, 324-345, 392-408,
- *  471-478. That leaves seven lit scenes — but the LAST one holds two distinct
- *  moments, the guy with his phone in the supplement area and then the walk to
- *  the counter, which is why the walkthrough has eight products and only seven
- *  captions. Each number below sits well inside its scene, clear of both seams. */
-const DWELL_FRAMES = [41, 107, 178, 240, 304, 368, 430, 458];
-const DWELL = DWELL_FRAMES.map((f) => f / LAST);
-const STOPS = [0, Math.max(DWELL[0], 0.09), ...DWELL.slice(1)];
-/** every hop runs at 24fps — duration is the frame distance, never a guess */
-const DURATIONS = STOPS.slice(0, -1).map((s, i) => ((STOPS[i + 1] - s) * LAST) / 24);
 
 /* ── SCENE LINKS ──────────────────────────────────────────────────────────
-   One product per scene. The seven beats and the consolidated taxonomy happen
-   to be exactly seven things, so this is a clean 1:1 — Lumin One (Move, Fuel,
-   Market) and Lumin Pro (Core, Academy, Connect, Loops).
+   Each link is pinned to the ACTUAL OBJECT it represents, not to whatever
+   corner happened to be empty. Node coordinates were read off the dwell frame
+   with a source-space grid, so they land on the thing itself:
 
-   Anchors are SOURCE-SPACE coordinates (1920x1080) chosen by scoring each
-   dwell frame's quietest region — low brightness, low variance — so a marker
-   lands in real negative space in that shot rather than floating over the
-   action. They map to screen through the same object-fit:cover transform the
-   footage uses, which is why they stay pinned to the scene at any viewport.
-   Labels flip to the left of the node when the anchor is near the right edge. */
+     Loops     the check-in tablet on the reception counter
+     Connect   the iMac she is working on
+     Trainer   the tablet in the coach's hands
+     Companion the selectorised machine
+     Station   the Station screen
+     Studio    the class screen on the wall
+     Fuel      the phone
+     Market    the supplements on the counter
+
+   `label` is offset from the node into nearby negative space and joined by an
+   elbow hairline — the Mass-Effect callout read, where the brief hangs off the
+   object rather than covering it. Offsets are per-link because the empty space
+   is in a different direction in every shot.
+
+   TWO STOPS PER SCENE. One swipe carries you in, a second moves you through it,
+   and both sit well inside the lit footage — never in a dissolve, which is what
+   parking on a scene boundary would do. */
 const SRC_W = 1920, SRC_H = 1080;
 const SCENE_LINKS = [
-  { beat: "check-in",  product: "Loops",     x: 1120, y: 405 },
-  { beat: "sales",     product: "Connect",   x: 1740, y: 675 },
-  { beat: "pt-floor",  product: "Trainer",   x: 1120, y: 675 },
-  { beat: "gym-floor", product: "Companion", x: 1740, y: 675 },
-  { beat: "station",   product: "Station",   x: 1440, y: 675 },
-  { beat: "studio",    product: "Studio",    x: 1740, y: 405 },
-  { beat: "fuel",      product: "Fuel",      x: 1440, y: 675 },
-  { beat: "market",    product: "Market",    x: 1120, y: 405 },
+  { product: "Loops",     frames: [32, 55],   x: 868, y: 496, dx:  168, dy:  -96 },
+  { product: "Connect",   frames: [95, 122],  x: 807, y: 378, dx:  174, dy: -142 },
+  { product: "Trainer",   frames: [168, 192], x: 1038, y: 349, dx:  162, dy: -112 },
+  { product: "Companion", frames: [228, 254], x: 276, y: 600, dx:  186, dy: -232 },
+  { product: "Station",   frames: [295, 315], x: 919, y: 429, dx: -236, dy: -152 },
+  { product: "Studio",    frames: [356, 382], x: 1532, y: 337, dx: -224, dy: -104 },
+  { product: "Fuel",      frames: [420, 435], x: 940, y: 540, dx: -204, dy: -184 },
+  { product: "Market",    frames: [448, 464], x: 960, y: 550, dx: -214, dy: -192 },
 ];
 
 /** map a source-space point to screen, matching object-fit: cover */
 function coverPoint(vw: number, vh: number, sx: number, sy: number) {
   const scale = Math.max(vw / SRC_W, vh / SRC_H);
-  return { left: (vw - SRC_W * scale) / 2 + sx * scale, top: (vh - SRC_H * scale) / 2 + sy * scale };
+  return {
+    left: (vw - SRC_W * scale) / 2 + sx * scale,
+    top: (vh - SRC_H * scale) / 2 + sy * scale,
+    scale,
+  };
 }
+
+/** stop 0 is the opening orb; then two per scene, in frame order */
+const STOPS = [0, ...SCENE_LINKS.flatMap((s) => s.frames).map((f) => f / LAST)];
+/** every hop runs at the film's 24fps — the frame distance, never a guess */
+const DURATIONS = STOPS.slice(0, -1).map((s, i) => Math.max(0.5, ((STOPS[i + 1] - s) * LAST) / 24));
 
 /** caption windows in progress space, proportional to beat frame ranges */
 const WINDOWS = JOURNEY.beats.map((b) => {
@@ -333,64 +341,42 @@ export default function Hero() {
           </div>
         </div>
         {/* ── SCENE LINKS ────────────────────────────────────────────────
-               One product marker per scene, anchored to a measured quiet spot
-               in that shot. Only the current scene's marker is mounted, and
-               only once the beat has SETTLED — while travelling, `stopIdx` is -1
-               and nothing shows, so a marker never drifts across a moving
-               frame. The hold is unlimited, so there is always time to click. */}
-        {vp.w > 0 && stopIdx >= 1 && SCENE_LINKS[stopIdx - 1] && (() => {
-          const link = SCENE_LINKS[stopIdx - 1];
+               A callout pinned to the object, not a chip in a corner. The node
+               sits ON the thing; an elbow hairline runs out to a bracketed
+               brief in nearby negative space. Only the settled scene's callout
+               mounts, so nothing drifts across a moving frame, and the hold is
+               unlimited — there is always time to read it and click. */}
+        {vp.w > 0 && stopIdx >= 1 && SCENE_LINKS[Math.floor((stopIdx - 1) / 2)] && (() => {
+          const link = SCENE_LINKS[Math.floor((stopIdx - 1) / 2)];
           const pt = coverPoint(vp.w, vp.h, link.x, link.y);
-          const flip = link.x > SRC_W * 0.72;   // near the right edge → label inboard
+          const lx = pt.left + link.dx * pt.scale;
+          const ly = pt.top + link.dy * pt.scale;
+          const leftward = link.dx < 0;
           return (
-            <div
-              key={link.beat}
-              className="absolute z-[4]"
-              style={{
-                left: pt.left, top: pt.top,
-                transform: "translate(-50%,-50%)",
-                animation: "heroLinkIn 0.7s cubic-bezier(.16,.84,.44,1) both",
-              }}
-            >
+            <div key={link.product} className="pointer-events-none absolute inset-0 z-[4]">
+              <svg className="absolute inset-0 h-full w-full overflow-visible" aria-hidden="true">
+                {/* elbow: out from the object, then a level run to the brief */}
+                <polyline
+                  points={`${pt.left},${pt.top} ${lx},${ly} ${lx + (leftward ? -26 : 26)},${ly}`}
+                  fill="none" stroke="rgba(150,200,255,0.75)" strokeWidth="1"
+                  style={{ filter: "drop-shadow(0 0 6px rgba(90,150,255,0.9))" }}
+                  className="hero-cue-line"
+                />
+                <circle cx={pt.left} cy={pt.top} r="4.5" fill="none" stroke="#cfe2ff" strokeWidth="1.4" />
+                <circle cx={pt.left} cy={pt.top} r="3" fill="var(--c-supernova)" className="hero-cue-core" />
+              </svg>
               <a
                 href={`#product-${link.product.toLowerCase()}`}
-                className="group flex items-center gap-3"
-                style={{ flexDirection: flip ? "row-reverse" : "row" }}
+                className="hero-brief pointer-events-auto absolute"
+                style={{
+                  left: lx + (leftward ? -26 : 26),
+                  top: ly,
+                  transform: `translateY(-50%)${leftward ? " translateX(-100%)" : ""}`,
+                }}
               >
-                {/* the node — same ring language as the launchpad's row dots */}
-                <span className="relative grid h-[13px] w-[13px] shrink-0 place-items-center">
-                  <span
-                    className="absolute inset-0 rounded-full"
-                    style={{ border: "1.5px solid rgba(255,255,255,0.9)" }}
-                  />
-                  <span
-                    className="absolute inset-0 rounded-full"
-                    style={{
-                      background: "var(--c-supernova)",
-                      animation: "heroLinkPulse 2.4s ease-out infinite",
-                    }}
-                  />
-                </span>
-                {/* hairline, drawn from the node toward the label */}
-                <span
-                  className="h-px w-8 shrink-0"
-                  style={{
-                    background: flip
-                      ? "linear-gradient(270deg, rgba(255,255,255,0.85), rgba(255,255,255,0))"
-                      : "linear-gradient(90deg, rgba(255,255,255,0.85), rgba(255,255,255,0))",
-                  }}
-                />
-                <span
-                  className="font-nav whitespace-nowrap rounded-full px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-white transition-all group-hover:tracking-[0.28em]"
-                  style={{
-                    background: "rgba(10,12,20,0.42)",
-                    border: "1px solid rgba(255,255,255,0.28)",
-                    backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
-                    textShadow: "0 1px 14px rgba(0,0,0,0.7)",
-                  }}
-                >
-                  {link.product} by Lumin
-                </span>
+                <span className="hero-brief-tag">Lumin</span>
+                <span className="hero-brief-name">{link.product}</span>
+                <span className="hero-brief-go" aria-hidden="true">›</span>
               </a>
             </div>
           );

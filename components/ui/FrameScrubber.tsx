@@ -45,6 +45,10 @@ export default function FrameScrubber({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imagesRef = useRef<(HTMLImageElement | null)[]>([]);
+  /** last frame actually PAINTED. A ref, not an effect local: the draw effect
+   *  re-runs on prop changes, and an effect-local would reset to null and let
+   *  the very next canvas wipe paint flat background instead of real footage. */
+  const lastImgRef = useRef<HTMLImageElement | null>(null);
 
   // Batched frame loading (8 frames / 50ms), frame 0 first — audit-faithful.
   useEffect(() => {
@@ -84,17 +88,6 @@ export default function FrameScrubber({
     const ctx = canvas.getContext("2d")!;
     let raf = 0;
     let lastFrame = -1;
-
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = canvas.offsetWidth * dpr;
-      canvas.height = canvas.offsetHeight * dpr;
-      lastFrame = -1; // force redraw
-    };
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
-
     const total = frameUrls?.length ?? frameCount;
 
     const drawImage = (img: HTMLImageElement) => {
@@ -119,7 +112,27 @@ export default function FrameScrubber({
       }
       const w = img.naturalWidth * s, h = img.naturalHeight * s;
       ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);
+      lastImgRef.current = img;
     };
+
+    // Defined AFTER drawImage on purpose. `const` arrow functions are in the
+    // temporal dead zone until their line runs, and resize() paints the held
+    // frame — calling it earlier threw "Cannot access 'drawImage' before
+    // initialization", which killed the whole render loop and left the canvas
+    // dead. That is the real origin of the footage cutting out.
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = canvas.offsetWidth * dpr;
+      canvas.height = canvas.offsetHeight * dpr;
+      lastFrame = -1;                       // force redraw
+      const held = lastImgRef.current;
+      if (held && held.complete) drawImage(held);   // …and never leave it wiped
+      else { ctx.fillStyle = background; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    };
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+
 
     /** Placeholder painter: dawn -> dark journey with a moving horizon marker,
      *  grid floor and frame counter. Communicates scrub state unambiguously. */
@@ -186,8 +199,13 @@ export default function FrameScrubber({
           drawPlaceholder(f, p);
           lastFrame = f;
           signalReady();
+        } else if (lastImgRef.current?.complete) {
+          // frame f is still downloading. Repaint the last good frame rather
+          // than leaving whatever the canvas happens to hold — after a resize
+          // that is nothing at all. Do NOT advance lastFrame, so the loop keeps
+          // retrying until the real frame decodes.
+          drawImage(lastImgRef.current);
         }
-        // if real frames are set but frame f isn't decoded yet: hold last frame
       }
       raf = requestAnimationFrame(loop);
     };

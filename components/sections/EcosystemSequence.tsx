@@ -124,6 +124,8 @@ export default function EcosystemSequence() {
   const idleLitRef = useRef(false);
   const cueRef = useRef(false);
   const suitesRef = useRef(false);
+  /** the activation has finished and the hub is the terminal state */
+  const settledRef = useRef(false);
 
   const [cueOn, setCueOn] = useState(false);
   const [suitesOn, setSuitesOn] = useState(false);
@@ -181,9 +183,9 @@ export default function EcosystemSequence() {
      *  scroll position this section owns, so one tween lands us on the void's
      *  PIN with no reverse scrub in between. */
     function goForward() {
+      releaseScroll();
       const y = Math.round(section.offsetTop + section.offsetHeight - window.innerHeight);
       const lenis = getLenis();
-      lenis?.start();
       lenis ? lenis.scrollTo(y, { duration: 1.1 }) : window.scrollTo({ top: y, behavior: "smooth" });
     }
 
@@ -191,24 +193,41 @@ export default function EcosystemSequence() {
      *  descent frame, i.e. the gate position — and hand scroll back so they can
      *  keep going up under their own power if they want. */
     function goBack() {
+      releaseScroll();
       const pinned = section.offsetHeight - window.innerHeight;
       const y = Math.round(section.offsetTop + pinned * GATE_AT);
       const lenis = getLenis();
-      lenis?.start();
       lenis ? lenis.scrollTo(y, { duration: 1.4 }) : window.scrollTo({ top: y, behavior: "smooth" });
     }
     navRef.current = { goForward, goBack };
 
-    function unlock() {
-      if (!lockedRef.current) return;
-      lockedRef.current = false;
+    /** Release the input block completely — ONLY the two buttons do this. */
+    function releaseScroll() {
       window.clearTimeout(ceilingTimer);
       window.removeEventListener("wheel", blockWheel);
       window.removeEventListener("touchmove", blockWheel);
       window.removeEventListener("keydown", blockKeys);
       window.removeEventListener("scroll", holdScroll);
+      lockedRef.current = false;
+      settledRef.current = false;
+      setCue(false);
       getLenis()?.start();
-      cueTimer = window.setTimeout(() => setCue(true), 1400);
+    }
+
+    /** The activation has finished. SCROLL DOES NOT COME BACK.
+     *  The lit hub is a terminal state reached by scrolling and left by
+     *  BUTTON — wheel, touch and keys stay blocked, and the two controls are
+     *  the only way out. Handing scroll back here is what produced the
+     *  "weird reverse thing where I have to force it": the visitor was
+     *  scrubbing 151vh of activation backwards without meaning to. */
+    function unlock() {
+      if (!lockedRef.current) return;
+      window.clearTimeout(ceilingTimer);
+      // deliberately NOT removing blockWheel / blockKeys / holdScroll,
+      // and deliberately NOT restarting Lenis.
+      settledRef.current = true;
+      setSuites(false);
+      cueTimer = window.setTimeout(() => setCue(true), 900);
     }
 
     function fireGate(gateY: number) {
@@ -272,6 +291,10 @@ export default function EcosystemSequence() {
       section.style.background = armed ? "#050508" : "transparent";
     }
 
+    // The nav pill is the escape hatch from the permanent hub lock.
+    const onNavRelease = () => releaseScroll();
+    window.addEventListener("lumin:releaseGates", onNavRelease);
+
     const ctx = gsap.context(() => {
       // 0. entry guard — spans the whole time the section touches the
       //    viewport, so it covers the approach that trigger 1 never sees.
@@ -298,7 +321,10 @@ export default function EcosystemSequence() {
           paintIdle(p);
           // The cue belongs to the dwell only — not while they're scrubbing
           // back through the activation, and not once they've acted on it.
-          setCue(!lockedRef.current && activatedRef.current && p >= BAND_END - IDLE_FADE && p < BAND_END + 0.06);
+          // The controls belong to the settled hub. They must NOT be gated on
+          // lockedRef any more — the lock is now permanent once we arrive, so
+          // that test would hide the buttons forever.
+          if (!settledRef.current) setCue(false);
           setSuites(!activatedRef.current && p > GATE_AT * 0.86);
         },
       });
@@ -328,6 +354,7 @@ export default function EcosystemSequence() {
 
     return () => {
       ctx.revert();
+      window.removeEventListener("lumin:releaseGates", onNavRelease);
       gateTween?.kill();
       [ceilingTimer, cueTimer].forEach(window.clearTimeout);
       if (lockedRef.current) {

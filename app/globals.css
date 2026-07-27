@@ -158,22 +158,6 @@ body {
   .vs-plane{ opacity:1 !important; transform:translateY(-50%) !important; }
 }
 
-/* ── hero scene links ───────────────────────────────────────────────────
-   The marker fades up as its beat settles. The node keeps a slow pulse so a
-   held scene never reads as a frozen screenshot — it is the only thing moving
-   while the gate waits for the next gesture. */
-@keyframes heroLinkIn {
-  from { opacity: 0; transform: translate(-50%, -50%) translateY(10px); }
-  to   { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
-}
-@keyframes heroLinkPulse {
-  0%   { transform: scale(0.55); opacity: 0.95; }
-  70%  { transform: scale(1.9);  opacity: 0; }
-  100% { transform: scale(1.9);  opacity: 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  [style*="heroLinkIn"] { animation: none !important; opacity: 1 !important; }
-}
 
 /* ── ecosystem idle controls ────────────────────────────────────────────
    Instrumentation, not buttons. The hologram is the hero here, so these are
@@ -231,4 +215,46 @@ body {
 @media (max-width: 640px) {
   .eco-ctl { padding: 0.8rem 1.15rem; font-size: 9.5px; letter-spacing: 0.18em; }
   .eco-ctl-rule { width: 14px; }
+}
+
+/* ── hero scene callouts ────────────────────────────────────────────────
+   A holographic brief hanging off the object it describes: bracketed corners,
+   a hairline rule, a small system tag over the product name. Reads as
+   instrumentation in the scene rather than a web button on top of it. */
+@keyframes heroCueIn   { from { opacity: 0 } to { opacity: 1 } }
+@keyframes heroCueDraw { from { stroke-dashoffset: 260 } to { stroke-dashoffset: 0 } }
+@keyframes heroCuePulse{ 0%,100% { opacity:.55; r:3 } 50% { opacity:1; r:4.6 } }
+
+.hero-cue-line { stroke-dasharray: 260; animation: heroCueDraw .75s cubic-bezier(.16,.84,.44,1) both; }
+.hero-cue-core { animation: heroCuePulse 2.6s ease-in-out infinite; }
+
+.hero-brief {
+  display: inline-flex; align-items: baseline; gap: .62em;
+  padding: .62rem .95rem .62rem 1rem;
+  animation: heroCueIn .6s .18s both;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  color: #eaf2ff;
+  background: linear-gradient(180deg, rgba(18,30,58,.62), rgba(10,18,38,.52));
+  border: 1px solid rgba(150,200,255,.34);
+  /* clipped corners — the sci-fi bracket read, no border-radius */
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 0 0 1px rgba(10,20,45,.35), 0 14px 40px -14px rgba(0,0,0,.9),
+              inset 0 1px 0 rgba(190,220,255,.16);
+  transition: border-color .35s ease, background .35s ease, transform .35s ease;
+}
+.hero-brief:hover { border-color: rgba(190,220,255,.8); transform: translateY(-50%) scale(1.03); }
+.hero-brief[style*="translateX(-100%)"]:hover { transform: translateY(-50%) translateX(-100%) scale(1.03); }
+.hero-brief-tag {
+  font-size: 8px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase;
+  color: rgba(150,195,255,.72);
+}
+.hero-brief-name {
+  font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  text-shadow: 0 0 18px rgba(120,170,255,.55);
+}
+.hero-brief-go { font-size: 13px; color: rgba(150,195,255,.85); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-cue-line, .hero-brief, .hero-cue-core { animation: none !important; }
 }

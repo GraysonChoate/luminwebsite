@@ -134,6 +134,11 @@ export default function VoidSequence() {
       const armed = section.getBoundingClientRect().top <= 0;
       stage.style.visibility = armed ? "visible" : "hidden";
       section.style.background = armed ? "#f4f6f8" : "transparent";
+      // …and it must not EAT CLICKS while it is invisible. `-mt-[100vh]` parks
+      // this section over the ecosystem's last viewport, and at z-20 vs the
+      // ecosystem's z-10 it was swallowing every press on the hub's two exit
+      // controls — they rendered, lit up on hover, and did nothing.
+      section.style.pointerEvents = armed ? "auto" : "none";
     }
 
     const ctx = gsap.context(() => {

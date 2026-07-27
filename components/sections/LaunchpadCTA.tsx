@@ -75,6 +75,8 @@ const puUrls = Array.from(
    the power-up strip (clean outlines, before any glow bleeds over the edges) —
    measure on a lit frame and the glow adds 100+px of phantom width. */
 const SRC_W = 1920, SRC_H = 1080;
+/** the idle clip's panel sits 6 source px above the power-up's; measured */
+const IDLE_NUDGE_Y = 6;
 
 /** Row rects in SOURCE pixels. No pitch formula and no shared column: the
  *  inner card holds rows 1-3 (x=360 w=449), the outer panel holds rows 4-5
@@ -176,6 +178,8 @@ export default function LaunchpadCTA() {
   const filmRef = useRef<HTMLVideoElement>(null);
 
   const [vp, setVp] = useState({ w: 0, h: 0 });
+  /** the idle nudge in SCREEN px — the cover scale, so it holds at any size */
+  const idleShift = vp.w > 0 ? IDLE_NUDGE_Y * Math.max(vp.w / SRC_W, vp.h / SRC_H) : 0;
   useEffect(() => {
     const on = () => setVp({ w: window.innerWidth, h: window.innerHeight });
     on(); window.addEventListener("resize", on);
@@ -264,7 +268,10 @@ export default function LaunchpadCTA() {
       {phase === "idle" && (
         <>
           {/* idle loop, double-buffered */}
-          <div className="pointer-events-none absolute inset-0 z-0">
+          <div
+            className="pointer-events-none absolute inset-0 z-0"
+            style={{ transform: `translateY(${idleShift}px)` }}
+          >
             {[idleARef, idleBRef].map((r, i) => (
               <video
                 key={i}

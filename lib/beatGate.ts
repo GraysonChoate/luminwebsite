@@ -301,6 +301,7 @@ export function createScrubCatch({
    *  tail and below any real scroll, so a flick can never release its own
    *  catch and a scroller is never held for more than a beat. */
   const INTENT_PX = 200;
+  const KEY_HOLD_MS = 1200;   // a keypress is one gesture; give it a real dwell
 
   const span = () => Math.max(1, section.offsetHeight - window.innerHeight);
   const yFor = (p: number) => Math.round(section.offsetTop + span() * p);
@@ -373,7 +374,18 @@ export function createScrubCatch({
       }
       last = p;
     },
-    onLeave: () => letGo(),
+    // Leaving the section is the last chance to honour an anchor. A single
+    // large jump — PageDown, or Lenis resolving a big target — can carry past
+    // the final anchor and out of the trigger in ONE update, so the crossing
+    // test above never sees it and that product is silently skipped. Measured
+    // on keyboard input: Market missed every run. Sweep on the way out and
+    // catch anything that was jumped over; grab() snaps back to it.
+    onLeave: () => {
+      if (held >= 0) { letGo(); return; }
+      for (let i = 0; i < anchors.length; i++) {
+        if (!done.has(i) && anchors[i] > last) { last = anchors[i]; grab(i); return; }
+      }
+    },
     onLeaveBack: () => letGo(),
   });
 
@@ -381,7 +393,10 @@ export function createScrubCatch({
     if (held < 0) return;
     if (!KEYS.has(e.key)) return;
     e.preventDefault();
-    if (performance.now() - caughtAt < 350) return;
+    // Match the wheel's dwell. At 350ms a keyboard user got the callout for a
+    // blink — long enough for the catch to register, far too short to read the
+    // product or click it, which defeats the entire point of catching.
+    if (performance.now() - caughtAt < KEY_HOLD_MS) return;
     letGo();
   };
   /** Every wheel event — blocked or not — feeds this.

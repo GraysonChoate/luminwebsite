@@ -272,18 +272,28 @@ export function createScrubCatch({
   const done = new Set<number>();      // anchors already released
   let last = 0;
 
-  /* ── ONE FLICK IS NOT ONE GESTURE ──────────────────────────────────────
-     A trackpad flick emits dozens of wheel events over ~600ms. Releasing on
-     the first one meant the remaining tail of the SAME flick blew straight
-     through every anchor after it — the whole journey firing off in one
-     swipe. A release now needs two things: the catch must have been held
-     briefly, and the wheel stream must have gone quiet first, which is what
-     actually distinguishes a new deliberate gesture from the tail of the old
-     one. Flick events are ~10-30ms apart; a real second gesture is not. */
+  /* ── TELLING A NEW GESTURE FROM AN OLD ONE'S TAIL ─────────────────────
+     A trackpad flick is not a handful of events. macOS drives a short push and
+     then a LONG inertial tail — up to ~2.5s — where the deltas decay toward
+     1px AND the gaps between events WIDEN toward ~250ms. Both properties
+     matter, and missing the second one is what broke every previous attempt:
+     a fixed "quiet for 160ms" test starts passing partway down the tail, so
+     the tail released the catch it had just triggered and carried on. Measured
+     with a faithful tail simulation: all eight anchors skipped, every one
+     landing ~4 frames past its catch.
+
+     So arm on SILENCE, not on a gap, and demand a real push to fire:
+       1. a timer that only fires after the wheel has been quiet 320ms — longer
+          than any gap inside a decaying tail;
+       2. and then a wheel event of at least MIN_DELTA, which a tail decayed to
+          a couple of pixels can never produce.
+     Both must hold, so no tail of any length or shape can release a catch. */
   let caughtAt = 0;
-  let lastWheelAt = 0;
+  let armed = false;
+  let armTimer: number | undefined;
   const MIN_HOLD_MS = 420;    // the catch is always readable
-  const QUIET_MS = 160;       // the previous flick must have ended
+  const SILENCE_MS = 320;     // longer than any gap inside a momentum tail
+  const MIN_DELTA = 15;       // a tail decays well below this; a push does not
 
   const span = () => Math.max(1, section.offsetHeight - window.innerHeight);
   const yFor = (p: number) => Math.round(section.offsetTop + span() * p);
@@ -305,6 +315,8 @@ export function createScrubCatch({
     window.addEventListener("touchmove", block, { passive: false });
     window.addEventListener("scroll", hold);
     caughtAt = performance.now();
+    armed = false;
+    window.clearTimeout(armTimer);
     onCatch(i);
   }
 
@@ -312,6 +324,8 @@ export function createScrubCatch({
     if (held < 0) return;
     done.add(held);
     held = -1;
+    armed = false;
+    window.clearTimeout(armTimer);
     window.removeEventListener("wheel", block);
     window.removeEventListener("touchmove", block);
     window.removeEventListener("scroll", hold);
@@ -354,15 +368,15 @@ export function createScrubCatch({
     if (performance.now() - caughtAt < MIN_HOLD_MS) return;
     letGo();
   };
-  /** every wheel event marks the stream, blocked or not */
-  const onWheel = () => {
-    const now = performance.now();
-    const quiet = now - lastWheelAt;
-    lastWheelAt = now;
+  /** every wheel event — blocked or not — resets the silence timer */
+  const onWheel = (e: WheelEvent) => {
     if (held < 0) return;
-    if (now - caughtAt < MIN_HOLD_MS) return;   // still landing
-    if (quiet < QUIET_MS) return;               // tail of the same flick
-    letGo();
+    const push = Math.abs(e.deltaY) >= MIN_DELTA;
+    if (armed && push && performance.now() - caughtAt >= MIN_HOLD_MS) { letGo(); return; }
+    // still hearing the old gesture: disarm and wait for real silence again
+    armed = false;
+    window.clearTimeout(armTimer);
+    armTimer = window.setTimeout(() => { armed = true; }, SILENCE_MS);
   };
   let ty = 0;
   const onTouchStart = (e: TouchEvent) => { ty = e.touches[0].clientY; };
@@ -373,7 +387,7 @@ export function createScrubCatch({
   };
   const navRelease = () => letGo();
 
-  window.addEventListener("wheel", onWheel, { passive: true });
+  window.addEventListener("wheel", onWheel as EventListener, { passive: true });
   window.addEventListener("keydown", onKey);
   window.addEventListener("touchstart", onTouchStart, { passive: true });
   window.addEventListener("touchend", onTouchEnd, { passive: true });
@@ -383,7 +397,8 @@ export function createScrubCatch({
     destroy() {
       letGo();
       watcher.kill();
-      window.removeEventListener("wheel", onWheel);
+      window.clearTimeout(armTimer);
+      window.removeEventListener("wheel", onWheel as EventListener);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchend", onTouchEnd);

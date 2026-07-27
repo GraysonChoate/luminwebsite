@@ -311,7 +311,7 @@ export default function Hero() {
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative h-[500vh]" style={{ background: "var(--c-cosmos)" }}>
+    <section ref={sectionRef} data-nav-tone="dark" className="relative h-[500vh]" style={{ background: "var(--c-cosmos)" }}>
       {/* sticky media layer */}
       <div className="sticky top-0 h-screen overflow-clip">
         <div ref={canvasWrapRef} className="absolute inset-0">

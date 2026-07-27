@@ -586,6 +586,7 @@ export default function EcosystemSequence() {
     // children, which share the root stacking context.
     <section
       ref={sectionRef}
+      data-nav-tone="dark"
       className="relative isolate z-10 -mt-[100vh] h-[426vh]"
       // both start invisible: at load we are in the approach, and paintStage
       // arms them the moment the section pins. See the header note.

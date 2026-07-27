@@ -64,28 +64,37 @@ export default function FrameScrubber({
    *  the very next canvas wipe paint flat background instead of real footage. */
   const lastImgRef = useRef<HTMLImageElement | null>(null);
 
-  // ── THREE-PASS LOADING ────────────────────────────────────────────────
-  //  1. the whole proxy strip, fast, so there is always something real to draw
-  //  2. the priority (catch) frames at full res, so a hold is never soft
-  //  3. everything else in order, streaming in underneath
+  // ── LOADING: A MOVING WINDOW, NOT THE WHOLE FILM ──────────────────────
+  //  The old loader asked for every frame at once. For the journey and the
+  //  void together that is 2,126 images and, decoded, several GIGABYTES of
+  //  bitmap. The browser decodes those on the main thread, which is exactly
+  //  where the picture is drawn — measured, 4.3% of frames fell below 30fps
+  //  with stalls up to 160ms, and that is the lag you can feel.
+  //
+  //  So: the proxy strip is small enough to fetch whole (it is what guarantees
+  //  something is always on screen), but FULL-RESOLUTION frames are only
+  //  fetched in a window around wherever the visitor actually is. Scrolling
+  //  drags the window along. Nothing far away is ever decoded, so nothing
+  //  competes with the frame you are looking at.
   useEffect(() => {
     if (!frameUrls?.length) return;
-    imagesRef.current = new Array(frameUrls.length).fill(null);
-    proxyRef.current = new Array(frameUrls.length).fill(null);
+    const N = frameUrls.length;
+    imagesRef.current = new Array(N).fill(null);
+    proxyRef.current = new Array(N).fill(null);
     let cancelled = false;
 
-    const done = new Array(frameUrls.length).fill(false);
+    const done = new Array(N).fill(false);
     let edge = 0;
     const tick = (i: number) => {
       done[i] = true;
       while (done[edge]) edge++;
       if (readyRef) readyRef.current = edge;
     };
-
     const into = (
       arr: (HTMLImageElement | null)[], url: string, i: number,
       after?: (i: number) => void,
     ) => {
+      if (arr[i]) return;
       const img = new Image();
       img.src = url;
       const ok = () => after?.(i);
@@ -94,29 +103,39 @@ export default function FrameScrubber({
       arr[i] = img;
     };
 
-    if (proxyUrls?.length === frameUrls.length) {
+    // 1. the whole proxy strip, gently — small files, and it is the safety net
+    if (proxyUrls?.length === N) {
       const q = proxyUrls.map((_, i) => i);
       const pumpProxy = () => {
         if (cancelled || !q.length) return;
-        q.splice(0, 12).forEach((i) => into(proxyRef.current, proxyUrls[i], i));
-        setTimeout(pumpProxy, 30);
+        q.splice(0, 6).forEach((i) => into(proxyRef.current, proxyUrls[i], i));
+        setTimeout(pumpProxy, 45);
       };
       pumpProxy();
     }
 
-    const pri = priority ?? [];
-    pri.forEach((i) => into(imagesRef.current, frameUrls[i], i, tick));
+    // 2. the frames the film actually stops on, at full res, first
+    (priority ?? []).forEach((i) => into(imagesRef.current, frameUrls[i], i, tick));
 
-    const rest = frameUrls.map((_, i) => i).filter((i) => !pri.includes(i));
-    const pumpFull = () => {
-      if (cancelled || !rest.length) return;
-      rest.splice(0, 6).forEach((i) => into(imagesRef.current, frameUrls[i], i, tick));
-      setTimeout(pumpFull, 60);
+    // 3. full res only AROUND the visitor, following them as they move
+    const BEHIND = 40, AHEAD = 110, PER_TICK = 4;
+    const chase = () => {
+      if (cancelled) return;
+      const f = Math.round(Math.min(1, Math.max(0, progressRef.current)) * (N - 1));
+      let budget = PER_TICK;
+      for (let d = 0; d <= AHEAD && budget > 0; d++) {
+        for (const i of d === 0 ? [f] : [f + d, f - d]) {
+          if (i < 0 || i >= N) continue;
+          if (d > BEHIND && i < f) continue;             // do not chase backwards far
+          if (!imagesRef.current[i]) { into(imagesRef.current, frameUrls[i], i, tick); if (--budget <= 0) break; }
+        }
+      }
+      setTimeout(chase, 90);
     };
-    pumpFull();
+    chase();
 
     return () => { cancelled = true; };
-  }, [frameUrls, proxyUrls, priority, readyRef]);
+  }, [frameUrls, proxyUrls, priority, readyRef, progressRef]);
 
   useEffect(() => {
     const canvas = canvasRef.current!;

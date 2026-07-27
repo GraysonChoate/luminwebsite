@@ -25,43 +25,33 @@ export default function NavPill() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [onLight, setOnLight] = useState(false);
 
+  /* ── WHICH SECTION IS UNDER THE PILL ──────────────────────────────────
+     This used to read the canvas with getImageData to judge the brightness
+     behind it. That is a GPU-to-CPU readback, and doing it on every scroll
+     event cost 29.8% of the main thread — 13.6 seconds out of 45 while
+     scrolling the journey, and the single biggest source of the stutter.
+     Sections declare their own tone with data-nav-tone instead, so this is a
+     DOM lookup and nothing more. */
   useEffect(() => {
     let raf = 0;
     const sample = () => {
       raf = 0;
-      // the media painting behind the pill is a canvas (scrubbed sections) or a
-      // video (idle loops). read the brightest available source at the pill's y.
-      const y = 46;
-      let lum: number | null = null;
-      for (const c of Array.from(document.querySelectorAll("canvas"))) {
-        const r = c.getBoundingClientRect();
-        if (r.height < 200 || r.top > y || r.bottom < y) continue;
-        const ctx = (c as HTMLCanvasElement).getContext("2d");
-        if (!ctx) continue;
-        try {
-          const sx = Math.round(((window.innerWidth / 2) - r.left) / r.width * c.width);
-          const sy = Math.round((y - r.top) / r.height * c.height);
-          const d = ctx.getImageData(Math.max(0, sx), Math.max(0, sy), 1, 1).data;
-          if (d[3] > 8) lum = (d[0] * 0.299 + d[1] * 0.587 + d[2] * 0.114);
-        } catch { /* tainted or zero-sized — fall through */ }
-      }
-      // no canvas answer: fall back to the section's own background colour
-      if (lum === null) {
-        const el = document.elementFromPoint(window.innerWidth / 2, y + 90);
-        const bg = el ? getComputedStyle(el).backgroundColor : "";
-        const m = bg.match(/(\d+),\s*(\d+),\s*(\d+)/);
-        if (m) lum = +m[1] * 0.299 + +m[2] * 0.587 + +m[3] * 0.114;
-      }
-      if (lum !== null) setOnLight(lum > 150);
+      // BELOW the pill, not at it — hit-testing at the pill's own y just finds
+      // the pill, which is how it stayed white over the white void.
+      const el = document.elementFromPoint(window.innerWidth / 2, 150);
+      const owner = el?.closest<HTMLElement>("[data-nav-tone]");
+      setOnLight(owner?.dataset.navTone === "light");
     };
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(sample); };
     sample();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
+    window.addEventListener("lumin:navTone", sample);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
+      window.removeEventListener("lumin:navTone", sample);
     };
   }, []);
 
@@ -77,8 +67,21 @@ export default function NavPill() {
    *  one exit worth trusting. */
   const releaseGates = () => window.dispatchEvent(new CustomEvent("lumin:releaseGates"));
 
+  /** Back to the very beginning — the whole film, from the top.
+   *  A scroll to 0 is not enough: by the time anyone wants this, products have
+   *  been caught, the ecosystem has been activated and the Launchpad has taken
+   *  the screen. A reload is the only thing that puts every one of those back
+   *  to its opening state, and the frames are already cached so it is quick. */
+  const goHome = () => {
+    setMenuOpen(false);
+    releaseGates();
+    window.scrollTo(0, 0);
+    window.location.reload();
+  };
+
   const go = (anchor: string) => {
     setMenuOpen(false);
+    if (anchor === "#home") return goHome();
     // The tabs become their own PAGES — the main page stays the cinematic
     // experience end to end. Nothing to scroll to here yet, so a tab is inert
     // until its page exists rather than dumping the visitor mid-film.
@@ -106,7 +109,7 @@ export default function NavPill() {
           }}
         >
           <button
-            onClick={() => { releaseGates(); getLenis()?.scrollTo(0); }}
+            onClick={goHome}
             className="flex items-center gap-2.5"
             aria-label="Lumin — back to top"
           >

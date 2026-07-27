@@ -98,13 +98,19 @@ const REST_X_L = 0.29, REST_X_R = 0.71, REST_Y = 0.55;
  *  from 0.23 to 1.0 and all five lines were gone. */
 const CATCH_SOFT_MS = 400, CATCH_HOLD_MS = 1300;
 
-/** copy runs between these two points of section progress */
-const FIRST = 0.26, LAST = 0.95;
+/** Copy runs between these two points of section progress.
+ *  CONTINUE JOURNEY lands at the end of the mapping transition (0.229). The
+ *  copy used to start at 0.26 and, because a line begins fading up almost as
+ *  soon as it starts travelling, words were already on screen the moment the
+ *  transition finished. Starting at 0.46 — with the fade held back until a
+ *  quarter of the way through the travel — leaves a clear stretch of empty
+ *  void to arrive into before anything appears. */
+const FIRST = 0.46, LAST = 0.95;
 const GAP = (LAST - FIRST) / (SLOTS.length - 1);
 /** Travel window. Wider than the gap, so a line is in flight for longer than
  *  the space between lines — it comes forward slowly and lingers instead of
  *  snapping in. The hard catches are gone; the pacing does the work now. */
-const W = GAP / 0.52;
+const W = GAP / 0.75;
 const Z_FAR = -2600;
 
 
@@ -208,7 +214,7 @@ export default function VoidSequence() {
             // Fade UP slowly over the first two thirds of the travel, hold at
             // full through the arrival, and only let go at the very end. It
             // used to reach full only at the lens and start dropping at once.
-            const fadeIn = c01((u - 0.05) / 0.55);
+            const fadeIn = c01((u - 0.25) / 0.5);
             const fadeOut = c01((0.34 - t) / 0.16);
             el.style.opacity = (fadeIn * fadeOut).toFixed(3);
             el.style.transform =
@@ -251,6 +257,7 @@ export default function VoidSequence() {
     // layers out of the neighbouring sections' stacking contexts.
     <section
       ref={sectionRef}
+      data-nav-tone="light"
       className="relative isolate z-20 -mt-[100vh] h-[500vh]"
       style={{ background: "transparent" }}
       aria-label="The white void"

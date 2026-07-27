@@ -190,6 +190,10 @@ export default function LaunchpadCTA() {
     return () => window.removeEventListener("resize", on);
   }, []);
 
+  /** the pill only re-reads its tone on scroll, and the phase change that
+   *  turns the white Launchpad into deep space is not a scroll */
+  useEffect(() => { window.dispatchEvent(new CustomEvent("lumin:navTone")); }, [phase]);
+
   const filled = FIELDS.filter(
     (f) => (values[f.id] ?? []).some((v) => v.trim()) && (f.type === "choice" || committed[f.id]),
   ).length;
@@ -267,7 +271,12 @@ export default function LaunchpadCTA() {
   if (phase === "hidden") return null;
 
   return (
-    <div className="fixed inset-0 z-40" aria-label="Launch your operation">
+    <div
+      className="fixed inset-0 z-40"
+      // the Launchpad is white; the launch and the orbit are deep space
+      data-nav-tone={phase === "idle" ? "light" : "dark"}
+      aria-label="Launch your operation"
+    >
       {/* ── the world ─────────────────────────────────────────────────── */}
       {phase === "idle" && (
         <>

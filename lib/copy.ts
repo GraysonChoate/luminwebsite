@@ -11,6 +11,8 @@ export const NAV = {
   // send anyone who wanted more of it. Destinations are placeholders; those
   // sections do not exist yet.
   items: [
+    // "#home" is special-cased in NavPill: it restarts the whole experience.
+    { label: "Home", anchor: "#home" },
     { label: "Platform", anchor: "#platform" },
     { label: "Products", anchor: "#products" },
     { label: "Why Lumin", anchor: "#why" },

@@ -139,15 +139,16 @@ body {
 }
 
 /* ── White Void copy planes ──────────────────────────────────────────────
-   Real type in a CSS 3D space. Left/right of frame only — the centre is the
-   architecture's. Each plane travels toward the lens and fades AS it arrives.  */
+   Real type in a CSS 3D space. Every line is anchored to the VANISHING POINT
+   (66% / 29.4%, measured off the footage) and is pushed out to its side of
+   frame by the transform as it travels forward — so the copy is born at the
+   horizon where the floor trails converge, not at the edge it ends up on. */
 .vs-plane{
-  position:absolute; top:50%; transform-style:preserve-3d;
+  position:absolute; left:66%; top:29.4%; text-align:center;
+  transform-style:preserve-3d;
   will-change:transform,opacity; opacity:0; color:var(--c-cosmos);
   font-family:var(--font-heebo), sans-serif;
 }
-.vs-L{ left:6vw }
-.vs-R{ right:6vw; text-align:right }
 .vs-statement{ font-size:clamp(30px,4.1vw,74px); line-height:1.02;
                letter-spacing:-0.045em; font-weight:500 }
 .vs-step{ font-size:clamp(18px,1.9vw,33px); line-height:1.22;
@@ -155,7 +156,7 @@ body {
 
 /* reduced motion: no travel, no perspective — copy simply holds, stacked */
 @media (prefers-reduced-motion: reduce){
-  .vs-plane{ opacity:1 !important; transform:translateY(-50%) !important; }
+  .vs-plane{ opacity:1 !important; transform:translate(-50%,-50%) !important; }
 }
 
 
@@ -169,16 +170,20 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.7em;
-  padding: 0.95rem 1.7rem;
+  padding: 1.15rem 2.15rem;
   border-radius: 999px;
   font-family: var(--font-montserrat), system-ui, sans-serif;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.26em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.035);
+  /* was 0.72 white on a 3.5% wash — it disappeared against the bright hub.
+     Solid white type and a real (still dark, still glassy) plate behind it. */
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  background: rgba(8, 12, 26, 0.42);
+  text-shadow: 0 1px 18px rgba(0, 0, 0, 0.85);
+  box-shadow: 0 10px 34px -16px rgba(0, 0, 0, 0.9);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   transition: color .45s ease, border-color .45s ease, background .45s ease,
@@ -186,8 +191,8 @@ body {
 }
 .eco-ctl:hover {
   color: #fff;
-  border-color: rgba(255, 255, 255, 0.34);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(16, 24, 46, 0.6);
   letter-spacing: 0.3em;
 }
 .eco-ctl-arrow { opacity: .45; transition: opacity .45s ease, transform .45s ease; }
@@ -257,4 +262,46 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .hero-cue-line, .hero-brief, .hero-cue-core { animation: none !important; }
+}
+
+/* ── ACTIVATE ECOSYSTEM ─────────────────────────────────────────────────
+   The one thing that starts the hub, so it should read as charged and waiting
+   rather than as another control. It sits over the resting orb: a ring of
+   light that breathes, with the glow pushed OUTSIDE the plate so it never
+   washes out the type it contains. */
+@keyframes ecoReady {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(120,160,255,.55), 0 0 26px -4px rgba(82,112,255,.55),
+                         0 0 60px -10px rgba(82,112,255,.35); }
+  50%      { box-shadow: 0 0 0 1px rgba(170,200,255,.95), 0 0 46px -2px rgba(110,150,255,.9),
+                         0 0 110px -8px rgba(82,112,255,.65); }
+}
+@keyframes ecoHalo {
+  0%   { transform: scale(0.86); opacity: .75; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+.eco-activate {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 1.25rem 2.6rem;
+  border-radius: 999px;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: 12.5px; font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase;
+  color: #fff;
+  border: 1px solid rgba(150,185,255,.7);
+  background: radial-gradient(130% 200% at 50% 130%, rgba(82,112,255,.55) 0%, rgba(20,32,74,.55) 55%, rgba(8,12,26,.5) 100%);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  text-shadow: 0 1px 20px rgba(0,0,0,.75);
+  animation: ecoReady 2.4s ease-in-out infinite;
+  transition: transform .35s ease, letter-spacing .35s ease;
+}
+/* the pulse ring — a separate layer so the type never sits inside the bloom */
+.eco-activate::after {
+  content: ""; position: absolute; inset: -2px; border-radius: 999px;
+  border: 1px solid rgba(150,190,255,.85);
+  animation: ecoHalo 2.4s cubic-bezier(.22,.7,.3,1) infinite;
+  pointer-events: none;
+}
+.eco-activate:hover { transform: scale(1.04); letter-spacing: 0.34em; }
+@media (prefers-reduced-motion: reduce) {
+  .eco-activate, .eco-activate::after { animation: none; }
 }

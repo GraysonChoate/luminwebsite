@@ -67,6 +67,12 @@ const proxyUrls = Array.from(
    object rather than covering it. Offsets are per-link because the empty space
    is in a different direction in every shot.
 
+   `from`/`to` are the frames the callout is ON SCREEN for — the lit part of
+   that scene, clear of both dissolves. Visibility is driven by the FRAME, not
+   by the catch: tying it to the catch meant the link vanished the moment you
+   scrolled back, because a catch only fires going forward. The product belongs
+   to the scene, so it shows whenever that scene is on screen, either direction.
+
    ONE CATCH PER PRODUCT. Scroll scrubs the film freely; the page only takes
    over at these eight frames, where the object is unambiguously in shot. The
    callout exists only while caught, so a link can never appear over the wrong
@@ -74,14 +80,14 @@ const proxyUrls = Array.from(
    still walking and the check-in kiosk is not yet readable. */
 const SRC_W = 1920, SRC_H = 1080;
 const SCENE_LINKS = [
-  { product: "Loops",     frame:  54, x:  981, y: 527, dx:  178, dy: -128 },
-  { product: "Connect",   frame: 107, x:  807, y: 378, dx:  174, dy: -142 },
-  { product: "Trainer",   frame: 178, x: 1013, y: 433, dx:  186, dy: -150 },
-  { product: "Companion", frame: 240, x:  276, y: 600, dx:  186, dy: -232 },
-  { product: "Station",   frame: 304, x:  919, y: 429, dx: -236, dy: -152 },
-  { product: "Studio",    frame: 368, x: 1532, y: 337, dx: -224, dy: -104 },
-  { product: "Fuel",      frame: 430, x:  940, y: 540, dx: -204, dy: -184 },
-  { product: "Market",    frame: 458, x:  960, y: 550, dx: -214, dy: -192 },
+  { product: "Loops",     frame:  54, from:  22, to:  63, x:  981, y: 527, dx:  178, dy: -128 },
+  { product: "Connect",   frame: 107, from:  86, to: 130, x:  807, y: 378, dx:  174, dy: -142 },
+  { product: "Trainer",   frame: 178, from: 160, to: 198, x: 1013, y: 433, dx:  186, dy: -150 },
+  { product: "Companion", frame: 240, from: 221, to: 262, x:  276, y: 600, dx:  186, dy: -232 },
+  { product: "Station",   frame: 304, from: 290, to: 321, x:  919, y: 429, dx: -236, dy: -152 },
+  { product: "Studio",    frame: 368, from: 350, to: 389, x: 1532, y: 337, dx: -224, dy: -104 },
+  { product: "Fuel",      frame: 430, from: 412, to: 443, x:  940, y: 540, dx: -204, dy: -184 },
+  { product: "Market",    frame: 458, from: 444, to: 468, x:  960, y: 550, dx: -214, dy: -192 },
 ];
 
 /** map a source-space point to screen, matching object-fit: cover */
@@ -135,7 +141,8 @@ export default function Hero() {
   const [openingDone, setOpeningDone] = useState(false); // orb-emerge loader lifted
   /** which gate stop we are parked on; -1 while a beat is travelling.
    *  NOT named `stop` — that resolves to the global `window.stop`. */
-  const [stopIdx, setStopIdx] = useState(-1);
+  /** which scene's callout is on screen, by FRAME — not by catch */
+  const [sceneIdx, setSceneIdx] = useState(-1);
   const [vp, setVp] = useState({ w: 0, h: 0 });
   /** frames decoded so far — kept for the scrubber's readiness reporting */
   const framesReady = useRef(0);
@@ -182,6 +189,9 @@ export default function Hero() {
         scrub: 0.6,
         onUpdate: (self) => {
           progressRef.current = self.progress;
+          const f = self.progress * LAST;
+          const i = SCENE_LINKS.findIndex((s) => f >= s.from && f <= s.to);
+          setSceneIdx((prev) => (prev === i ? prev : i));
         },
       });
 
@@ -289,8 +299,8 @@ export default function Hero() {
     const gate = createScrubCatch({
       section,
       anchors: ANCHORS,
-      onCatch: (i) => setStopIdx(i),
-      onRelease: () => setStopIdx(-1),
+      onCatch: () => {},
+      onRelease: () => {},
     });
 
     return () => {
@@ -346,11 +356,11 @@ export default function Hero() {
         {/* ── SCENE LINKS ────────────────────────────────────────────────
                A callout pinned to the object, not a chip in a corner. The node
                sits ON the thing; an elbow hairline runs out to a bracketed
-               brief in nearby negative space. Only the settled scene's callout
-               mounts, so nothing drifts across a moving frame, and the hold is
-               unlimited — there is always time to read it and click. */}
-        {vp.w > 0 && stopIdx >= 0 && SCENE_LINKS[stopIdx] && (() => {
-          const link = SCENE_LINKS[stopIdx];
+               brief in nearby negative space. It is mounted for its SCENE, so
+               it is there in both directions and never appears over another
+               shot; the catch holds you on it long enough to click. */}
+        {vp.w > 0 && sceneIdx >= 0 && SCENE_LINKS[sceneIdx] && (() => {
+          const link = SCENE_LINKS[sceneIdx];
           const pt = coverPoint(vp.w, vp.h, link.x, link.y);
           const lx = pt.left + link.dx * pt.scale;
           const ly = pt.top + link.dy * pt.scale;

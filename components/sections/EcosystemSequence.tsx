@@ -97,6 +97,10 @@ const DESCENT_S = 6.0417;
 /** how long "Product Suites" sits on the plate before the hub takes over */
 /** The descent in two gestures: start, halfway, orb at rest. */
 const DESCENT_STEPS = [0, 0.5, 1].map((f) => f * GATE_AT);
+/** the void's mapping transition occupies its first 134 of 585 frames */
+const VOID_MAPPING_END = 134 / 585;
+/** the eco→void transition's authored length, played not scrubbed */
+const TRANSITION_S = 5.6;
 /** the lock can never outlive this, whatever else happens */
 const LOCK_CEILING_MS = 9000;
 
@@ -177,11 +181,18 @@ export default function EcosystemSequence() {
      *  wheel has to fall silent, and then a real push has to arrive. */
     let gestureArmed = true;
     let quietTimer: number | undefined;
+    let rearmAt = 0;
     const onGesture = (ev: Event) => {
       if (!heldRef.current) return;
-      const dy = Math.abs((ev as WheelEvent).deltaY ?? 999);
-      if (gestureArmed && dy >= 20) {
+      const now = performance.now();
+      // Arm on silence OR on elapsed time. Silence alone froze the descent for
+      // anyone who never stops scrolling, and a delta threshold froze it for
+      // anyone scrolling gently — a trackpad emits deltas far below 20 when you
+      // move slowly. Either condition re-arms, so nothing can jam it.
+      if (now >= rearmAt) gestureArmed = true;
+      if (gestureArmed && Math.abs((ev as WheelEvent).deltaY ?? 999) >= 4) {
         gestureArmed = false;
+        rearmAt = now + 900;
         stepDescent();
       }
       window.clearTimeout(quietTimer);
@@ -271,18 +282,43 @@ export default function EcosystemSequence() {
       fireGate(Math.round(section.offsetTop + pinned * GATE_AT));
     }
 
+    /** CONTINUE JOURNEY — the transition plays itself.
+     *  It used to release scroll and tween at the same time, which handed the
+     *  page to the void's own catch mid-flight and looked like a freeze. Now
+     *  input stays captured for the whole handoff: the page is driven from the
+     *  hub, through this section's release, and on through the void's mapping
+     *  band at the clip's authored pace. Scroll is only given back once we are
+     *  fully inside the void — from there it drives to the Launchpad. */
     function goForward() {
+      if (travellingRef.current) return;
       exitingRef.current = true;
-      heldRef.current = false;
-      releaseScroll();
-      const y = Math.round(section.offsetTop + section.offsetHeight - window.innerHeight);
-      const lenis = getLenis();
-      lenis ? lenis.scrollTo(y, { duration: 1.1 }) : window.scrollTo({ top: y, behavior: "smooth" });
+      travellingRef.current = true;
+      setCue(false);
+      const voidEl = document.querySelector<HTMLElement>('[aria-label="The white void"]');
+      const here = window.scrollY;
+      // land past the mapping transition, i.e. fully in the void
+      const target = voidEl
+        ? Math.round(voidEl.offsetTop + (voidEl.offsetHeight - window.innerHeight) * VOID_MAPPING_END)
+        : Math.round(section.offsetTop + section.offsetHeight - window.innerHeight);
+      const from = { y: here };
+      gsap.to(from, {
+        y: target,
+        duration: TRANSITION_S,
+        ease: "none",
+        onUpdate: () => {
+          getLenis()?.stop();
+          pinnedTo = Math.round(from.y);
+          window.scrollTo(0, pinnedTo);
+          ScrollTrigger.update();
+        },
+        onComplete: () => {
+          travellingRef.current = false;
+          heldRef.current = false;
+          releaseScroll();               // scroll belongs to the void now
+        },
+      });
     }
 
-    /** back: return to the orb's final resting place in the floor — the last
-     *  descent frame, i.e. the gate position — and hand scroll back so they can
-     *  keep going up under their own power if they want. */
     function goBack() {
       exitingRef.current = true;
       heldRef.current = false;
@@ -620,10 +656,14 @@ export default function EcosystemSequence() {
 
         {/* "Product Suites" — the embedded link that sits on the plate once the
             orb is at rest in the floor, before the activation is fired. */}
+        {/* Centred, and lifted just clear of the glow on the floor so the
+            button reads as hovering over the resting orb rather than sitting
+            on it. */}
         <div
           className="absolute inset-x-0 z-[3] flex justify-center"
           style={{
-            bottom: "22%",
+            top: "50%",
+            transform: "translateY(-140%)",
             opacity: suitesOn ? 1 : 0,
             pointerEvents: suitesOn ? "auto" : "none",
             transition: "opacity 0.7s ease",
@@ -632,7 +672,7 @@ export default function EcosystemSequence() {
           <button
             type="button"
             onClick={() => navRef.current?.activate()}
-            className="eco-ctl eco-ctl-primary"
+            className="eco-activate"
           >
             {SUITES_LABEL}
           </button>

@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { gsap, ScrollTrigger } from "@/lib/motion";
 import FrameScrubber from "@/components/ui/FrameScrubber";
-import { createScrubCatch } from "@/lib/beatGate";
 
 /**
  * The White Void — the last scrollable section of the site.
@@ -77,23 +76,29 @@ const SLOTS: { side: "L" | "R"; html: string }[] = [
 /** one width for all of them, wide enough for the longest line at full size so
  *  nothing wraps into a third line and collides with its neighbour */
 const PLANE_W = 1000;
-/** one landing for all of them: just below centre, over the floor rather than
- *  the bright upper haze where dark type washes out */
-const PLANE_Y = 60;
+
+/* ── EVERYTHING COMES OUT OF THE HORIZON ─────────────────────────────────
+   Measured, not guessed: the brightest convergence on the horizon sits at
+   66.0% / 29.4% of frame and barely moves across the whole flythrough (63-66%
+   over seven sampled frames). That is the camera's axis — where the floor
+   trails run to. The perspective origin was 50% / 46%, so lines were flying out
+   of a point that is not in the picture.
+   Each line now STARTS at that point, tiny and far, and drifts out to its
+   resting side as it comes forward. */
+const VP_X = 0.660, VP_Y = 0.294;
+/** where a line ends up: a fraction of the viewport, and just below centre so
+ *  it sits over the floor rather than the bright upper haze */
+const REST_X_L = 0.29, REST_X_R = 0.71, REST_Y = 0.55;
 
 /** copy runs between these two points of section progress */
-const FIRST = 0.30, LAST = 0.94;
+const FIRST = 0.26, LAST = 0.95;
 const GAP = (LAST - FIRST) / (SLOTS.length - 1);
-const W = GAP / 0.7;
-const Z_FAR = -3400;
+/** Travel window. Wider than the gap, so a line is in flight for longer than
+ *  the space between lines — it comes forward slowly and lingers instead of
+ *  snapping in. The hard catches are gone; the pacing does the work now. */
+const W = GAP / 0.52;
+const Z_FAR = -2600;
 
-/** Each line ARRIVES at the lens at these points, and the scroll is caught on
- *  every one — the same mechanic as the journey. Free scrolling let a single
- *  flick carry the whole void past in about two seconds; snapping did not fix
- *  it because snapping only settles AFTER you stop pushing. A catch holds the
- *  line at the lens until you ask for the next one, which is the only thing
- *  that actually guarantees it gets read. */
-const ANCHORS = SLOTS.map((_, i) => FIRST + i * GAP);
 
 const c01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -117,7 +122,7 @@ export default function VoidSequence() {
     // build the copy planes once
     const planes = SLOTS.map((s) => {
       const el = document.createElement("div");
-      el.className = `vs-plane ${s.side === "L" ? "vs-L" : "vs-R"} vs-statement`;
+      el.className = `vs-plane vs-statement`;
       el.style.width = `${PLANE_W}px`;
       el.innerHTML = s.html;
       space.appendChild(el);
@@ -139,8 +144,6 @@ export default function VoidSequence() {
       // controls — they rendered, lit up on hover, and did nothing.
       section.style.pointerEvents = armed ? "auto" : "none";
     }
-
-    let catcher: ReturnType<typeof createScrubCatch> | null = null;
 
     const ctx = gsap.context(() => {
       // 0. entry guard — spans the whole time the section touches the viewport,
@@ -166,38 +169,36 @@ export default function VoidSequence() {
           frameProgress.current = p;
 
           if (reduced) return; // planes stay put; see the CSS fallback
-          SLOTS.forEach((_m, i) => {
+          const vw = space.clientWidth, vh = space.clientHeight;
+          SLOTS.forEach((m, i) => {
             const el = planes[i];
             const at = FIRST + i * GAP;
-            const t = (p - at) / W; // -1 far, 0 arrived
-            if (t < -1 || t > 0.22) { el.style.opacity = "0"; return; }
-            const tt = c01((t + 1) / 1.22) * 1.22 - 1;
-            const z = tt < 0 ? Z_FAR * Math.pow(-tt, 1.5) : 0;
-            const fadeIn = c01((tt + 1) / 0.5);
-            // Full opacity AT the lens, and the fade starts there — not before.
-            // The old envelope was c01((0.1 - tt) / 0.22), which is already 55%
-            // faded by arrival (tt = 0), so every line peaked at 0.46 and
-            // composited toward the haze: measured 2.0-2.6:1 against a
-            // background of 181-246 luminance, i.e. washed out at the exact
-            // moment it is meant to be read. Landing on 1.0 puts the statements
-            // near 10:1 and the steps near 6:1 with no colour or layout change.
-            const fadeOut = c01((0.22 - tt) / 0.22);
+            const t = (p - at) / W;            // -1 far away, 0 at the lens
+            if (t < -1 || t > 0.34) { el.style.opacity = "0"; return; }
+
+            // travel: 0 at the horizon, 1 at the resting spot
+            const u = c01(t + 1);
+            const ease = 1 - Math.pow(1 - u, 2.2);   // slow far away, quick near
+            const z = Z_FAR * (1 - ease);
+
+            // …and slide out from the vanishing point to its side of frame
+            const restX = (m.side === "L" ? REST_X_L : REST_X_R) * vw;
+            const dx = (restX - VP_X * vw) * ease;
+            const dy = (REST_Y * vh - VP_Y * vh) * ease;
+
+            // Fade UP slowly over the first two thirds of the travel, hold at
+            // full through the arrival, and only let go at the very end. It
+            // used to reach full only at the lens and start dropping at once.
+            const fadeIn = c01((u - 0.05) / 0.55);
+            const fadeOut = c01((0.34 - t) / 0.16);
             el.style.opacity = (fadeIn * fadeOut).toFixed(3);
             el.style.transform =
-              `translateY(calc(-50% + ${PLANE_Y}px)) translateZ(${z}px)`;
+              `translate(-50%, -50%) translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) translateZ(${z.toFixed(0)}px)`;
           });
         },
       });
 
-      // 2. hold on every line, so none of it can be flicked past
-      catcher = createScrubCatch({
-        section,
-        anchors: ANCHORS,
-        onCatch: () => {},
-        onRelease: () => {},
-      });
-
-      // 3. arrival — scroll's last job on this site. Hand off to the CTA.
+      // 2. arrival — scroll's last job on this site. Hand off to the CTA.
       ScrollTrigger.create({
         trigger: section,
         start: "bottom bottom",
@@ -213,7 +214,7 @@ export default function VoidSequence() {
       });
     }, section);
 
-    return () => { catcher?.destroy(); ctx.revert(); planes.forEach((p) => p.remove()); };
+    return () => { ctx.revert(); planes.forEach((p) => p.remove()); };
   }, [reduced]);
 
   return (
@@ -247,7 +248,11 @@ export default function VoidSequence() {
         <div
           ref={spaceRef}
           className="pointer-events-none absolute inset-0"
-          style={{ perspective: "1150px", perspectiveOrigin: "50% 46%", transformStyle: "preserve-3d" }}
+          style={{
+            perspective: "1150px",
+            perspectiveOrigin: `${VP_X * 100}% ${VP_Y * 100}%`,
+            transformStyle: "preserve-3d",
+          }}
         />
       </div>
     </section>

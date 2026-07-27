@@ -110,6 +110,10 @@ function coverRect(vw: number, vh: number, sx: number, sy: number, sw: number, s
   return { left: ox + sx * scale, top: oy + sy * scale, width: sw * scale, height: sh * scale };
 }
 
+/** A plausible address, not a spec-perfect one — the point is to catch "X" and
+ *  "me@" before they charge the gate, not to police valid TLDs. */
+const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
 type Field = {
   id: string; label: string; type: "text" | "email" | "choice";
   /** choice fields only */
@@ -314,8 +318,13 @@ export default function LaunchpadCTA() {
 
       {/* ── the form. Positioned by the SAME cover transform the video uses,
              so each input sits exactly on its baked row at any viewport. ── */}
+      {/* noValidate on purpose. The browser's own constraint validation silently
+          REFUSED to submit when the email did not parse — the button read
+          LAUNCH, the click landed, and nothing happened, with no message. Even
+          requestSubmit() was a no-op. We validate on commit instead, so a bad
+          address never charges the gate in the first place. */}
       {phase === "idle" && vp.w > 0 && (
-        <form onSubmit={submit} className="absolute inset-0 z-20">
+        <form onSubmit={submit} noValidate className="absolute inset-0 z-20">
           {FIELDS.map((f, i) => {
             const row = ROWS[i];
             const r = coverRect(vp.w, vp.h, row.x, row.cy - row.h / 2, row.w, row.h);
@@ -330,7 +339,13 @@ export default function LaunchpadCTA() {
                   style={{ top: -4, left: 2, color: done ? "rgba(255,255,255,0.85)" : "rgba(33,33,33,0.48)" }}
                 >
                   {f.label}
-                  {hasText && !done && f.type !== "choice" && (
+                  {hasText && !done && f.type === "email" && !EMAIL_OK.test(picked[0] ?? "") && (
+                    <span style={{ marginLeft: 8, color: "var(--c-flare, #FF004B)" }}>
+                      needs a full address
+                    </span>
+                  )}
+                  {hasText && !done && f.type !== "choice"
+                    && !(f.type === "email" && !EMAIL_OK.test(picked[0] ?? "")) && (
                     <span style={{ marginLeft: 8, opacity: 0.55 }}>press enter</span>
                   )}
                 </span>
@@ -436,11 +451,18 @@ export default function LaunchpadCTA() {
                     setCommitted((c) => (c[f.id] ? { ...c, [f.id]: false } : c));
                   }}
                   onFocus={() => setOpenPicker(null)}
-                  onBlur={() => { if ((values[f.id]?.[0] ?? "").trim()) setCommitted((c) => ({ ...c, [f.id]: true })); }}
+                  onBlur={() => {
+                    const v = (values[f.id]?.[0] ?? "").trim();
+                    if (v && (f.type !== "email" || EMAIL_OK.test(v))) {
+                      setCommitted((c) => ({ ...c, [f.id]: true }));
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key !== "Enter") return;
                     e.preventDefault();          // Enter commits, it does not submit
-                    if (!(values[f.id]?.[0] ?? "").trim()) return;
+                    const v = (values[f.id]?.[0] ?? "").trim();
+                    if (!v) return;
+                    if (f.type === "email" && !EMAIL_OK.test(v)) return;  // stays uncommitted
                     setCommitted((c) => ({ ...c, [f.id]: true }));
                     const form = e.currentTarget.form;
                     const fields = form ? Array.from(form.querySelectorAll<HTMLElement>("input, button[type=button]")) : [];

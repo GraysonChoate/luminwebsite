@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { gsap, ScrollTrigger } from "@/lib/motion";
 import FrameScrubber from "@/components/ui/FrameScrubber";
+import { createScrubCatch } from "@/lib/beatGate";
 
 /**
  * The White Void — the last scrollable section of the site.
@@ -90,6 +91,13 @@ const VP_X = 0.660, VP_Y = 0.294;
  *  it sits over the floor rather than the bright upper haze */
 const REST_X_L = 0.29, REST_X_R = 0.71, REST_Y = 0.55;
 
+/** Each line eases to a stop as it reaches the lens. NOT the hard snap the
+ *  journey uses — the copy is still travelling here, so a jump reads as a jolt.
+ *  It glides in over 0.4s, holds, and carries on by itself. Without any pacing
+ *  a single flick crossed the ENTIRE void: measured, one swipe took progress
+ *  from 0.23 to 1.0 and all five lines were gone. */
+const CATCH_SOFT_MS = 400, CATCH_HOLD_MS = 1300;
+
 /** copy runs between these two points of section progress */
 const FIRST = 0.26, LAST = 0.95;
 const GAP = (LAST - FIRST) / (SLOTS.length - 1);
@@ -145,6 +153,8 @@ export default function VoidSequence() {
       section.style.pointerEvents = armed ? "auto" : "none";
     }
 
+    let catcher: ReturnType<typeof createScrubCatch> | null = null;
+
     const ctx = gsap.context(() => {
       // 0. entry guard — spans the whole time the section touches the viewport,
       //    so it sees the approach that the scrubbed trigger never fires during.
@@ -168,6 +178,15 @@ export default function VoidSequence() {
           const p = self.progress;
           frameProgress.current = p;
 
+          // Fire the handoff from PROGRESS, not from a trigger parked on
+          // "bottom bottom". That start lands on the document's final pixel —
+          // there is no room left to cross it, so onEnter never fired and the
+          // Launchpad was unreachable. Measured: progress sat at 1.000 with no
+          // event. 0.995 always has scroll left to reach it.
+          if (p >= 0.995 && !arrivedRef.current) {
+            arrivedRef.current = true;
+            window.dispatchEvent(new CustomEvent("lumin:voidArrived"));
+          }
           if (reduced) return; // planes stay put; see the CSS fallback
           const vw = space.clientWidth, vh = space.clientHeight;
           SLOTS.forEach((m, i) => {
@@ -198,7 +217,17 @@ export default function VoidSequence() {
         },
       });
 
-      // 2. arrival — scroll's last job on this site. Hand off to the CTA.
+      // 2. hold each line as it lands, gently
+      catcher = createScrubCatch({
+        section,
+        anchors: SLOTS.map((_, i) => FIRST + i * GAP),
+        softMs: CATCH_SOFT_MS,
+        holdMs: CATCH_HOLD_MS,
+        onCatch: () => {},
+        onRelease: () => {},
+      });
+
+      // 3. arrival — scroll's last job on this site. Hand off to the CTA.
       ScrollTrigger.create({
         trigger: section,
         start: "bottom bottom",
@@ -214,7 +243,7 @@ export default function VoidSequence() {
       });
     }, section);
 
-    return () => { ctx.revert(); planes.forEach((p) => p.remove()); };
+    return () => { catcher?.destroy(); ctx.revert(); planes.forEach((p) => p.remove()); };
   }, [reduced]);
 
   return (

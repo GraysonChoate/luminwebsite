@@ -47,13 +47,20 @@ const KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End
 export type ScrubCatch = { destroy: () => void };
 
 export function createScrubCatch({
-  section, anchors, onCatch, onRelease,
+  section, anchors, onCatch, onRelease, softMs = 0, holdMs = 1600,
 }: {
   section: HTMLElement;
   /** anchor positions in section-progress space (0..1), ascending */
   anchors: number[];
   onCatch: (i: number) => void;
   onRelease: () => void;
+  /** Ease to the anchor over this long instead of jumping to it. 0 is a hard
+   *  snap, which is right in the journey where the frame is already the scene.
+   *  The white void wants the gentler version — the copy is still travelling
+   *  toward the lens, and a jump reads as a jolt. */
+  softMs?: number;
+  /** how long the anchor is held before it releases itself */
+  holdMs?: number;
 }): ScrubCatch {
   let held = -1;                       // index currently caught, or -1
   let pinnedTo = 0;
@@ -76,8 +83,8 @@ export function createScrubCatch({
      It holds for a fixed beat and releases itself. Nothing to detect, nothing
      to tune, and no input pattern that can jam it — you cannot deadlock a
      timer. Scroll on and the next product catches in turn.  */
-  const HOLD_MS = 1600;
   let holdTimer: number | undefined;
+  let softTween: gsap.core.Tween | null = null;
 
   const span = () => Math.max(1, section.offsetHeight - window.innerHeight);
   const yFor = (p: number) => Math.round(section.offsetTop + span() * p);
@@ -98,20 +105,32 @@ export function createScrubCatch({
     // (the last anchor, swept up on the way out) was immediately dragged back
     // out by the stale target and the callout flashed for 0.0s. Measured on
     // keyboard input: Market appeared and vanished inside one frame.
-    lenis?.scrollTo(pinnedTo, { immediate: true, force: true });
     lenis?.stop();
-    window.scrollTo(0, pinnedTo);
-    ScrollTrigger.update();
     window.addEventListener("wheel", block, { passive: false });
     window.addEventListener("touchmove", block, { passive: false });
-    window.addEventListener("scroll", hold);
+    if (softMs > 0) {
+      // glide to the anchor instead of jumping to it
+      const from = { y: window.scrollY };
+      softTween?.kill();
+      softTween = gsap.to(from, {
+        y: pinnedTo, duration: softMs / 1000, ease: "power2.out",
+        onUpdate: () => { getLenis()?.stop(); window.scrollTo(0, Math.round(from.y)); ScrollTrigger.update(); },
+        onComplete: () => { window.addEventListener("scroll", hold); },
+      });
+    } else {
+      lenis?.scrollTo(pinnedTo, { immediate: true, force: true });
+      window.scrollTo(0, pinnedTo);
+      ScrollTrigger.update();
+      window.addEventListener("scroll", hold);
+    }
     window.clearTimeout(holdTimer);
-    holdTimer = window.setTimeout(letGo, HOLD_MS);
+    holdTimer = window.setTimeout(letGo, softMs + holdMs);
     onCatch(i);
   }
 
   function letGo() {
     if (held < 0) return;
+    softTween?.kill();
     window.clearTimeout(holdTimer);
     done.add(held);
     held = -1;
@@ -177,6 +196,7 @@ export function createScrubCatch({
     destroy() {
       letGo();
       watcher.kill();
+      softTween?.kill();
       window.clearTimeout(holdTimer);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("lumin:releaseGates", navRelease);

@@ -231,8 +231,12 @@ export default function EcosystemSequence() {
       if (heldRef.current || exitingRef.current) return;
       heldRef.current = true;
       const pinned = section.offsetHeight - window.innerHeight;
-      // snap to wherever we are in the descent, rounded back to a known step
-      pinnedTo = Math.round(section.offsetTop + pinned * DESCENT_STEPS[stepRef.current]);
+      // Once the ecosystem has been activated the hub IS this section's state,
+      // so coming back to it lands on the lit hub with its two controls — not
+      // back at a descent step it has already played.
+      const at = activatedRef.current ? BAND_END : DESCENT_STEPS[stepRef.current];
+      pinnedTo = Math.round(section.offsetTop + pinned * at);
+      if (activatedRef.current) { settledRef.current = true; setCue(true); }
       const lenis = getLenis();
       lenis?.scrollTo(pinnedTo, { immediate: true, force: true });
       lenis?.stop();
@@ -319,14 +323,21 @@ export default function EcosystemSequence() {
       });
     }
 
+    /** GO BACK — to the orb at rest in the floor, with scroll handed back so
+     *  they can carry on up into the gym. Scrolling FORWARD again re-arms this
+     *  section: without that they slid straight through the ecosystem into the
+     *  void with no controls at all, having left the hub behind. */
     function goBack() {
       exitingRef.current = true;
       heldRef.current = false;
+      setCue(false);
       releaseScroll();
       const pinned = section.offsetHeight - window.innerHeight;
       const y = Math.round(section.offsetTop + pinned * GATE_AT);
       const lenis = getLenis();
       lenis ? lenis.scrollTo(y, { duration: 1.4 }) : window.scrollTo({ top: y, behavior: "smooth" });
+      // let it take the screen again once they head forward
+      window.setTimeout(() => { exitingRef.current = false; }, 1600);
     }
     navRef.current = { goForward, goBack, activate };
 

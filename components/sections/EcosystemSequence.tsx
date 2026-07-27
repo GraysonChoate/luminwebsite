@@ -203,6 +203,10 @@ export default function EcosystemSequence() {
 
     /** Release the input block completely — ONLY the two buttons do this. */
     function releaseScroll() {
+      // Kill the activation tween FIRST. It animates window.scrollTo every
+      // frame, so dropping the listeners without stopping it left something
+      // still driving the page — the nav escape hatch appeared to do nothing.
+      gateTween?.kill();
       window.clearTimeout(ceilingTimer);
       window.removeEventListener("wheel", blockWheel);
       window.removeEventListener("touchmove", blockWheel);

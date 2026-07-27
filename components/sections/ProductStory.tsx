@@ -196,7 +196,12 @@ export default function ProductStory() {
     <section
       ref={sectionRef}
       id="platform"
-      className="relative bg-white lg:h-[var(--story-h)]"
+      // overflow-x-clip, not hidden: the media video is scaled ~1.06 for parallax,
+      // so at lg (where the mask goes overflow-visible) it sat 48px proud of each
+      // edge and pushed the whole DOCUMENT 38px wider than the window — a
+      // horizontal scrollbar on every desktop width. `clip` does not create a
+      // scroll container, so the sticky children keep working.
+      className="relative overflow-x-clip bg-white lg:h-[var(--story-h)]"
       style={{ "--story-h": `${(N - 1) * 60 + 100}vh` } as React.CSSProperties}
     >
       <div className="relative flex flex-col py-24 lg:sticky lg:top-0 lg:h-screen lg:justify-center lg:py-0">

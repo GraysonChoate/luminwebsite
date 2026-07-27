@@ -5,7 +5,7 @@ import { gsap, ScrollTrigger } from "@/lib/motion";
 import { HERO, JOURNEY } from "@/lib/copy";
 import SplitChars from "@/components/ui/SplitChars";
 import FrameScrubber from "@/components/ui/FrameScrubber";
-import { createBeatGate } from "@/lib/beatGate";
+import { createScrubCatch } from "@/lib/beatGate";
 
 /**
  * Cinematic scroll-journey hero — one continuous 7-beat sequence scrubbed by
@@ -62,19 +62,21 @@ const frameUrls = (variant: "desktop" | "mobile") =>
    object rather than covering it. Offsets are per-link because the empty space
    is in a different direction in every shot.
 
-   TWO STOPS PER SCENE. One swipe carries you in, a second moves you through it,
-   and both sit well inside the lit footage — never in a dissolve, which is what
-   parking on a scene boundary would do. */
+   ONE CATCH PER PRODUCT. Scroll scrubs the film freely; the page only takes
+   over at these eight frames, where the object is unambiguously in shot. The
+   callout exists only while caught, so a link can never appear over the wrong
+   scene. `frame` is the caught frame — Loops is 54 (not 41) because at 41 he is
+   still walking and the check-in kiosk is not yet readable. */
 const SRC_W = 1920, SRC_H = 1080;
 const SCENE_LINKS = [
-  { product: "Loops",     frames: [32, 55],   x: 868, y: 496, dx:  168, dy:  -96 },
-  { product: "Connect",   frames: [95, 122],  x: 807, y: 378, dx:  174, dy: -142 },
-  { product: "Trainer",   frames: [168, 192], x: 1038, y: 349, dx:  162, dy: -112 },
-  { product: "Companion", frames: [228, 254], x: 276, y: 600, dx:  186, dy: -232 },
-  { product: "Station",   frames: [295, 315], x: 919, y: 429, dx: -236, dy: -152 },
-  { product: "Studio",    frames: [356, 382], x: 1532, y: 337, dx: -224, dy: -104 },
-  { product: "Fuel",      frames: [420, 435], x: 940, y: 540, dx: -204, dy: -184 },
-  { product: "Market",    frames: [448, 464], x: 960, y: 550, dx: -214, dy: -192 },
+  { product: "Loops",     frame:  54, x:  981, y: 527, dx:  178, dy: -128 },
+  { product: "Connect",   frame: 107, x:  807, y: 378, dx:  174, dy: -142 },
+  { product: "Trainer",   frame: 178, x: 1013, y: 433, dx:  186, dy: -150 },
+  { product: "Companion", frame: 240, x:  276, y: 600, dx:  186, dy: -232 },
+  { product: "Station",   frame: 304, x:  919, y: 429, dx: -236, dy: -152 },
+  { product: "Studio",    frame: 368, x: 1532, y: 337, dx: -224, dy: -104 },
+  { product: "Fuel",      frame: 430, x:  940, y: 540, dx: -204, dy: -184 },
+  { product: "Market",    frame: 458, x:  960, y: 550, dx: -214, dy: -192 },
 ];
 
 /** map a source-space point to screen, matching object-fit: cover */
@@ -87,10 +89,8 @@ function coverPoint(vw: number, vh: number, sx: number, sy: number) {
   };
 }
 
-/** stop 0 is the opening orb; then two per scene, in frame order */
-const STOPS = [0, ...SCENE_LINKS.flatMap((s) => s.frames).map((f) => f / LAST)];
-/** every hop runs at the film's 24fps — the frame distance, never a guess */
-const DURATIONS = STOPS.slice(0, -1).map((s, i) => Math.max(0.5, ((STOPS[i + 1] - s) * LAST) / 24));
+/** the eight catch points, in section-progress space */
+const ANCHORS = SCENE_LINKS.map((s) => s.frame / LAST);
 
 /** caption windows in progress space, proportional to beat frame ranges */
 const WINDOWS = JOURNEY.beats.map((b) => {
@@ -126,11 +126,10 @@ export default function Hero() {
   const [openingDone, setOpeningDone] = useState(false); // orb-emerge loader lifted
   /** which gate stop we are parked on; -1 while a beat is travelling.
    *  NOT named `stop` — that resolves to the global `window.stop`. */
-  const [stopIdx, setStopIdx] = useState(0);
+  const [stopIdx, setStopIdx] = useState(-1);
   const [vp, setVp] = useState({ w: 0, h: 0 });
-  /** frames decoded so far — the gate will not step past them */
+  /** frames decoded so far — kept for the scrubber's readiness reporting */
   const framesReady = useRef(0);
-  const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
     const on = () => setVp({ w: window.innerWidth, h: window.innerHeight });
@@ -278,18 +277,11 @@ export default function Hero() {
     // 4. THE GATE. Mounted after the scrubbed rig above, deliberately: the gate
     //    animates SCROLL rather than frames, so every rule built above keeps
     //    driving itself off its own ScrollTrigger with nothing to keep in sync.
-    const gate = createBeatGate({
+    const gate = createScrubCatch({
       section,
-      stops: STOPS,
-      durations: DURATIONS,
-      onSettle: (i) => { setStopIdx(i); setStalled(false); },
-      onTravel: () => setStopIdx(-1),
-      // Refuse to step into footage the browser has not decoded. 478 frames is
-      // ~33MB; a gated hop demands 65 of them at 24fps the instant you gesture,
-      // where free scrubbing used to give the loader time to keep up. Without
-      // this the journey plays to a blank canvas — scenes "cut out".
-      canAdvance: (to) => Math.ceil(STOPS[to] * LAST) + 8 <= framesReady.current,
-      onStall: () => setStalled(true),
+      anchors: ANCHORS,
+      onCatch: (i) => setStopIdx(i),
+      onRelease: () => setStopIdx(-1),
     });
 
     return () => {
@@ -346,8 +338,8 @@ export default function Hero() {
                brief in nearby negative space. Only the settled scene's callout
                mounts, so nothing drifts across a moving frame, and the hold is
                unlimited — there is always time to read it and click. */}
-        {vp.w > 0 && stopIdx >= 1 && SCENE_LINKS[Math.floor((stopIdx - 1) / 2)] && (() => {
-          const link = SCENE_LINKS[Math.floor((stopIdx - 1) / 2)];
+        {vp.w > 0 && stopIdx >= 0 && SCENE_LINKS[stopIdx] && (() => {
+          const link = SCENE_LINKS[stopIdx];
           const pt = coverPoint(vp.w, vp.h, link.x, link.y);
           const lx = pt.left + link.dx * pt.scale;
           const ly = pt.top + link.dy * pt.scale;

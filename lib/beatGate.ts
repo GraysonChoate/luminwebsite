@@ -234,3 +234,126 @@ export function createBeatGate({ section, stops, durations, onSettle, onTravel, 
     },
   };
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   SCRUB + CATCH — the combo.
+
+   The full stepper made every inch of the film a discrete hop, which reads as
+   clunky: eight scenes became sixteen jerks with a hold between each. But free
+   scrubbing lets a flick blow past the product moments, which is the thing
+   that actually matters.
+
+   So: scroll SCRUBS normally — smooth, yours, at whatever pace you like — and
+   the page only takes over at the ANCHORS. Cross a product moment and it
+   catches you there, freezes on the frame where that object is clearly in shot,
+   and shows the callout. One deliberate gesture releases it and scrubbing
+   resumes until the next anchor. Eight catches across the whole journey
+   instead of sixteen hops, and the holds land exactly where there is something
+   to read and click.
+
+   Each anchor catches ONCE going forward. Scrolling back is free — you have
+   already seen it, and re-catching on the way out is what made the ecosystem
+   feel like it had to be forced.
+   ════════════════════════════════════════════════════════════════════════ */
+
+export type ScrubCatch = { destroy: () => void };
+
+export function createScrubCatch({
+  section, anchors, onCatch, onRelease,
+}: {
+  section: HTMLElement;
+  /** anchor positions in section-progress space (0..1), ascending */
+  anchors: number[];
+  onCatch: (i: number) => void;
+  onRelease: () => void;
+}): ScrubCatch {
+  let held = -1;                       // index currently caught, or -1
+  let pinnedTo = 0;
+  const done = new Set<number>();      // anchors already released
+  let last = 0;
+
+  const span = () => Math.max(1, section.offsetHeight - window.innerHeight);
+  const yFor = (p: number) => Math.round(section.offsetTop + span() * p);
+
+  const block = (e: Event) => e.preventDefault();
+  const hold = () => {
+    if (held < 0) return;
+    getLenis()?.stop();               // re-assert: Lenis may mount after us
+    if (window.scrollY !== pinnedTo) window.scrollTo(0, pinnedTo);
+  };
+
+  function grab(i: number) {
+    held = i;
+    pinnedTo = yFor(anchors[i]);
+    getLenis()?.stop();
+    window.scrollTo(0, pinnedTo);
+    ScrollTrigger.update();
+    window.addEventListener("wheel", block, { passive: false });
+    window.addEventListener("touchmove", block, { passive: false });
+    window.addEventListener("scroll", hold);
+    onCatch(i);
+  }
+
+  function letGo() {
+    if (held < 0) return;
+    done.add(held);
+    held = -1;
+    window.removeEventListener("wheel", block);
+    window.removeEventListener("touchmove", block);
+    window.removeEventListener("scroll", hold);
+    getLenis()?.start();
+    onRelease();
+    // step just past the anchor so the crossing test cannot re-fire
+    const nudge = pinnedTo + Math.round(window.innerHeight * 0.12);
+    getLenis()?.scrollTo(nudge, { duration: 0.5 });
+  }
+
+  const watcher = ScrollTrigger.create({
+    trigger: section,
+    start: "top top",
+    end: "bottom bottom",
+    onUpdate: (self) => {
+      if (held >= 0) return;
+      const p = self.progress;
+      if (p > last) {                                  // forward only
+        for (let i = 0; i < anchors.length; i++) {
+          if (!done.has(i) && last < anchors[i] && p >= anchors[i]) { grab(i); break; }
+        }
+      }
+      last = p;
+    },
+    onLeave: () => letGo(),
+    onLeaveBack: () => letGo(),
+  });
+
+  const onKey = (e: KeyboardEvent) => {
+    if (held < 0) return;
+    if (KEYS.has(e.key)) { e.preventDefault(); letGo(); }
+  };
+  const onWheel = () => { if (held >= 0) letGo(); };
+  let ty = 0;
+  const onTouchStart = (e: TouchEvent) => { ty = e.touches[0].clientY; };
+  const onTouchEnd = (e: TouchEvent) => {
+    if (held < 0) return;
+    if (Math.abs(ty - (e.changedTouches[0]?.clientY ?? ty)) > 24) letGo();
+  };
+  const navRelease = () => letGo();
+
+  window.addEventListener("wheel", onWheel, { passive: true });
+  window.addEventListener("keydown", onKey);
+  window.addEventListener("touchstart", onTouchStart, { passive: true });
+  window.addEventListener("touchend", onTouchEnd, { passive: true });
+  window.addEventListener("lumin:releaseGates", navRelease);
+
+  return {
+    destroy() {
+      letGo();
+      watcher.kill();
+      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("lumin:releaseGates", navRelease);
+    },
+  };
+}

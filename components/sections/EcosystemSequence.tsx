@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { gsap, ScrollTrigger } from "@/lib/motion";
 import { getLenis } from "@/components/SmoothScroll";
+import { createScrubCatch } from "@/lib/beatGate";
 import FrameScrubber from "@/components/ui/FrameScrubber";
 
 /**
@@ -91,6 +92,10 @@ const ACTIVATION_S = 6.0417;
 const IDLE_FADE = 15 / 326; // ≈ 15vh — a dissolve in both directions
 /** post-activation hold so the release doesn't feel abrupt */
 const HOLD_MS = 700;
+/** the descent's authored length — 144 frames at 24fps */
+const DESCENT_S = 6.0417;
+/** how long "Product Suites" sits on the plate before the hub takes over */
+const SUITES_DWELL_MS = 1500;
 /** the lock can never outlive this, whatever else happens */
 const LOCK_CEILING_MS = 9000;
 
@@ -138,6 +143,8 @@ export default function EcosystemSequence() {
     let ceilingTimer: number | undefined;
     let cueTimer: number | undefined;
     let gateTween: gsap.core.Tween | null = null;
+    let descentGate: ReturnType<typeof createScrubCatch> | null = null;
+    let handoff: number | undefined;
     let pinnedTo = 0;
 
     /** setState only on a real change — this runs from a scroll handler */
@@ -203,6 +210,9 @@ export default function EcosystemSequence() {
 
     /** Release the input block completely — ONLY the two buttons do this. */
     function releaseScroll() {
+      window.clearTimeout(handoff);
+      descentGate?.destroy();
+      descentGate = null;
       // Kill the activation tween FIRST. It animates window.scrollTo every
       // frame, so dropping the listeners without stopping it left something
       // still driving the page — the nav escape hatch appeared to do nothing.
@@ -329,16 +339,35 @@ export default function EcosystemSequence() {
           // lockedRef any more — the lock is now permanent once we arrive, so
           // that test would hide the buttons forever.
           if (!settledRef.current) setCue(false);
-          setSuites(!activatedRef.current && p > GATE_AT * 0.86);
         },
       });
 
-      // 2. the gate — its OWN un-scrubbed trigger so it fires on true scroll
-      //    position, not the eased scrub value. `self.start` IS the gate Y.
-      ScrollTrigger.create({
-        trigger: section,
-        start: () => `top top-=${(section.offsetHeight - window.innerHeight) * GATE_AT}`,
-        onEnter: (self) => fireGate(self.start),
+      // 2. THE DESCENT IS CAUGHT — two scrolls put the orb in the ground.
+      //    A stepper does not work here: the hero's last release hands over
+      //    with live momentum, so the visitor can already be at 0.40 by the
+      //    time this section pins, and a stepper that only engages when pinned
+      //    has nothing left to gate. A CATCH fires on the crossing itself, at
+      //    any arrival speed, and snaps back to the anchor — the same
+      //    primitive the journey uses, already proven against momentum tails.
+      //
+      //    Anchor 1 is the orb halfway down. Anchor 2 is it at rest in the
+      //    floor, and that one does not wait for a gesture: it shows the
+      //    embedded Product Suites link, holds a beat, then the ecosystem
+      //    takes itself over into the idle hub.
+      descentGate = createScrubCatch({
+        section,
+        anchors: [GATE_AT * 0.5, GATE_AT],
+        onCatch: (i) => {
+          if (i < 1 || activatedRef.current) return;
+          setSuites(true);
+          const pinned = section.offsetHeight - window.innerHeight;
+          handoff = window.setTimeout(() => {
+            descentGate?.destroy();
+            descentGate = null;
+            fireGate(Math.round(section.offsetTop + pinned * GATE_AT));
+          }, SUITES_DWELL_MS);
+        },
+        onRelease: () => {},
       });
 
       // 3. the idle clips are small but pointless to fetch early; give them
@@ -359,6 +388,8 @@ export default function EcosystemSequence() {
     return () => {
       ctx.revert();
       window.removeEventListener("lumin:releaseGates", onNavRelease);
+      window.clearTimeout(handoff);
+      descentGate?.destroy();
       gateTween?.kill();
       [ceilingTimer, cueTimer].forEach(window.clearTimeout);
       if (lockedRef.current) {

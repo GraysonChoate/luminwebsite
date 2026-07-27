@@ -290,10 +290,17 @@ export function createScrubCatch({
      Both must hold, so no tail of any length or shape can release a catch. */
   let caughtAt = 0;
   let armed = false;
-  let armTimer: number | undefined;
-  const MIN_HOLD_MS = 420;    // the catch is always readable
+  let silenceTimer: number | undefined;
+  let hardTimer: number | undefined;
+  let intent = 0;             // |deltaY| accumulated since arming
   const SILENCE_MS = 320;     // longer than any gap inside a momentum tail
-  const MIN_DELTA = 15;       // a tail decays well below this; a push does not
+  const HARD_ARM_MS = 2000;   // …but arm anyway, so it can never deadlock
+  /** Measured, not guessed: after the hard arm fires, the remaining tail of a
+   *  peak-160 flick contributes ~62px and a peak-500 flick ~104px. A person
+   *  actively scrolling puts down 60px in a tick or two. 200 sits above every
+   *  tail and below any real scroll, so a flick can never release its own
+   *  catch and a scroller is never held for more than a beat. */
+  const INTENT_PX = 200;
 
   const span = () => Math.max(1, section.offsetHeight - window.innerHeight);
   const yFor = (p: number) => Math.round(section.offsetTop + span() * p);
@@ -316,7 +323,14 @@ export function createScrubCatch({
     window.addEventListener("scroll", hold);
     caughtAt = performance.now();
     armed = false;
-    window.clearTimeout(armTimer);
+    intent = 0;
+    window.clearTimeout(silenceTimer);
+    window.clearTimeout(hardTimer);
+    // THE DEADLOCK GUARD. Arming only on silence meant somebody who simply
+    // keeps scrolling never arms it at all — every event reset the timer and
+    // the catch held forever. Measured: frozen on the first product for 14s of
+    // continuous scrolling. This timer is never reset, so the hold always ends.
+    hardTimer = window.setTimeout(() => { armed = true; }, HARD_ARM_MS);
     onCatch(i);
   }
 
@@ -325,7 +339,9 @@ export function createScrubCatch({
     done.add(held);
     held = -1;
     armed = false;
-    window.clearTimeout(armTimer);
+    intent = 0;
+    window.clearTimeout(silenceTimer);
+    window.clearTimeout(hardTimer);
     window.removeEventListener("wheel", block);
     window.removeEventListener("touchmove", block);
     window.removeEventListener("scroll", hold);
@@ -365,24 +381,30 @@ export function createScrubCatch({
     if (held < 0) return;
     if (!KEYS.has(e.key)) return;
     e.preventDefault();
-    if (performance.now() - caughtAt < MIN_HOLD_MS) return;
+    if (performance.now() - caughtAt < 350) return;
     letGo();
   };
-  /** every wheel event — blocked or not — resets the silence timer */
+  /** Every wheel event — blocked or not — feeds this.
+   *  Once armed we measure INTENT rather than a single delta: a dying tail
+   *  contributes a few pixels over its last moments, a person scrolling
+   *  contributes 60 in a tick or two. That releases a gentle scroller as
+   *  readily as a hard one, which a single-delta threshold would not. */
   const onWheel = (e: WheelEvent) => {
     if (held < 0) return;
-    const push = Math.abs(e.deltaY) >= MIN_DELTA;
-    if (armed && push && performance.now() - caughtAt >= MIN_HOLD_MS) { letGo(); return; }
-    // still hearing the old gesture: disarm and wait for real silence again
-    armed = false;
-    window.clearTimeout(armTimer);
-    armTimer = window.setTimeout(() => { armed = true; }, SILENCE_MS);
+    if (armed) {
+      intent += Math.abs(e.deltaY);
+      if (intent >= INTENT_PX) { letGo(); return; }
+      return;
+    }
+    // not armed yet: keep waiting for the gesture to actually stop
+    window.clearTimeout(silenceTimer);
+    silenceTimer = window.setTimeout(() => { armed = true; intent = 0; }, SILENCE_MS);
   };
   let ty = 0;
   const onTouchStart = (e: TouchEvent) => { ty = e.touches[0].clientY; };
   const onTouchEnd = (e: TouchEvent) => {
     if (held < 0) return;
-    if (performance.now() - caughtAt < MIN_HOLD_MS) return;
+    if (performance.now() - caughtAt < 350) return;
     if (Math.abs(ty - (e.changedTouches[0]?.clientY ?? ty)) > 24) letGo();
   };
   const navRelease = () => letGo();
@@ -397,7 +419,8 @@ export function createScrubCatch({
     destroy() {
       letGo();
       watcher.kill();
-      window.clearTimeout(armTimer);
+      window.clearTimeout(silenceTimer);
+      window.clearTimeout(hardTimer);
       window.removeEventListener("wheel", onWheel as EventListener);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("touchstart", onTouchStart);

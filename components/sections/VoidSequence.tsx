@@ -201,12 +201,15 @@ export default function VoidSequence() {
       ScrollTrigger.create({
         trigger: section,
         start: "bottom bottom",
-        once: true,
+        // NOT `once`. The nav can now dismiss the Launchpad to reach the
+        // sections beneath it, so scrolling back down here has to be able to
+        // bring it back — otherwise leaving once removed the CTA for good.
         onEnter: () => {
           if (arrivedRef.current) return;
           arrivedRef.current = true;
           window.dispatchEvent(new CustomEvent("lumin:voidArrived"));
         },
+        onLeaveBack: () => { arrivedRef.current = false; },
       });
     }, section);
 

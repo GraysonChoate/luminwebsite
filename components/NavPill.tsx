@@ -79,9 +79,12 @@ export default function NavPill() {
 
   const go = (anchor: string) => {
     setMenuOpen(false);
-    releaseGates();
+    // The tabs become their own PAGES — the main page stays the cinematic
+    // experience end to end. Nothing to scroll to here yet, so a tab is inert
+    // until its page exists rather than dumping the visitor mid-film.
     const el = document.querySelector(anchor);
     if (!el) return;
+    releaseGates();
     const lenis = getLenis();
     if (lenis) lenis.scrollTo(el as HTMLElement, { offset: 0 });
     else el.scrollIntoView({ behavior: "smooth" });

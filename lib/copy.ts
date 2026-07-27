@@ -5,10 +5,16 @@
  */
 
 export const NAV = {
+  // Four tabs. "Contact" went because LET'S TALK sits two inches away doing the
+  // same job. "About" became "Company", and "Why Lumin" is new — the 30-years/
+  // same-20% thesis is the strongest argument on the page and had nowhere to
+  // send anyone who wanted more of it. Destinations are placeholders; those
+  // sections do not exist yet.
   items: [
     { label: "Platform", anchor: "#platform" },
-    { label: "About", anchor: "#about" },
-    { label: "Contact", anchor: "#contact" },
+    { label: "Products", anchor: "#products" },
+    { label: "Why Lumin", anchor: "#why" },
+    { label: "Company", anchor: "#about" },
   ],
   // "For You" (#for-you) removed with the Business Type Selector — restore both together.
   cta1: "See Demo",

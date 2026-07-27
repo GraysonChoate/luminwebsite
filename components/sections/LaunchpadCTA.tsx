@@ -164,6 +164,11 @@ export default function LaunchpadCTA() {
   const [phase, setPhase] = useState<Phase>("hidden");
   const [values, setValues] = useState<Record<string, string[]>>({});
   const [openPicker, setOpenPicker] = useState<string | null>(null);
+  /** Text answers only count once they are COMMITTED with Enter.
+   *  Without this the panel lit a row on the first keystroke — you typed one
+   *  letter and the gate rewarded you, which made the power-up feel automatic
+   *  instead of earned. A picker commits the moment you choose. */
+  const [committed, setCommitted] = useState<Record<string, boolean>>({});
   const puProgress = useRef(0);          // 0..1 across the power-up strip
   const targetRef = useRef(0);
   const rafRef = useRef(0);
@@ -179,7 +184,9 @@ export default function LaunchpadCTA() {
     return () => window.removeEventListener("resize", on);
   }, []);
 
-  const filled = FIELDS.filter((f) => (values[f.id] ?? []).some((v) => v.trim())).length;
+  const filled = FIELDS.filter(
+    (f) => (values[f.id] ?? []).some((v) => v.trim()) && (f.type === "choice" || committed[f.id]),
+  ).length;
   const charged = filled === FIELDS.length;
 
   /* ── take over when the void arrives ─────────────────────────────────── */
@@ -308,7 +315,8 @@ export default function LaunchpadCTA() {
             const row = ROWS[i];
             const r = coverRect(vp.w, vp.h, row.x, row.cy - row.h / 2, row.w, row.h);
             const picked = values[f.id] ?? [];
-            const done = picked.some((v) => v.trim());
+            const hasText = picked.some((v) => v.trim());
+            const done = hasText && (f.type === "choice" || committed[f.id]);
             const ink = Math.max(12, r.height * 0.38);
             return (
               <div key={f.id} className="absolute" style={{ left: r.left, top: r.top, width: r.width, height: r.height }}>
@@ -317,6 +325,9 @@ export default function LaunchpadCTA() {
                   style={{ top: -4, left: 2, color: done ? "rgba(33,33,33,0.78)" : "rgba(33,33,33,0.48)" }}
                 >
                   {f.label}
+                  {hasText && !done && f.type !== "choice" && (
+                    <span style={{ marginLeft: 8, opacity: 0.55 }}>press enter</span>
+                  )}
                 </span>
 
                 {f.type === "choice" ? (
@@ -415,8 +426,22 @@ export default function LaunchpadCTA() {
                 <input
                   type={f.type}
                   value={picked[0] ?? ""}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.id]: [e.target.value] }))}
+                  onChange={(e) => {
+                    setValues((v) => ({ ...v, [f.id]: [e.target.value] }));
+                    setCommitted((c) => (c[f.id] ? { ...c, [f.id]: false } : c));
+                  }}
                   onFocus={() => setOpenPicker(null)}
+                  onBlur={() => { if ((values[f.id]?.[0] ?? "").trim()) setCommitted((c) => ({ ...c, [f.id]: true })); }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    e.preventDefault();          // Enter commits, it does not submit
+                    if (!(values[f.id]?.[0] ?? "").trim()) return;
+                    setCommitted((c) => ({ ...c, [f.id]: true }));
+                    const form = e.currentTarget.form;
+                    const fields = form ? Array.from(form.querySelectorAll<HTMLElement>("input, button[type=button]")) : [];
+                    const at = fields.indexOf(e.currentTarget);
+                    fields[at + 1]?.focus();      // straight on to the next answer
+                  }}
                   className="h-full w-full bg-transparent px-4 outline-none"
                   style={{
                     // Cosmos on every row, filled or not. The old rule flipped to

@@ -234,31 +234,32 @@ body {
 .hero-cue-core { animation: heroCuePulse 2.6s ease-in-out infinite; }
 
 .hero-brief {
-  display: inline-flex; align-items: baseline; gap: .62em;
-  padding: .62rem .95rem .62rem 1rem;
+  display: inline-flex; align-items: baseline; gap: .7em;
+  padding: .92rem 1.5rem .92rem 1.6rem;
   animation: heroCueIn .6s .18s both;
   font-family: var(--font-montserrat), system-ui, sans-serif;
   color: #eaf2ff;
-  background: linear-gradient(180deg, rgba(18,30,58,.62), rgba(10,18,38,.52));
-  border: 1px solid rgba(150,200,255,.34);
+  background: linear-gradient(180deg, rgba(20,34,66,.78), rgba(10,18,38,.7));
+  border: 1px solid rgba(165,210,255,.55);
   /* clipped corners — the sci-fi bracket read, no border-radius */
   clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 0 0 1px rgba(10,20,45,.35), 0 14px 40px -14px rgba(0,0,0,.9),
-              inset 0 1px 0 rgba(190,220,255,.16);
+  box-shadow: 0 0 0 1px rgba(10,20,45,.4), 0 18px 50px -14px rgba(0,0,0,.95),
+              0 0 40px -8px rgba(90,140,255,.5),
+              inset 0 1px 0 rgba(190,220,255,.22);
   transition: border-color .35s ease, background .35s ease, transform .35s ease;
 }
 .hero-brief:hover { border-color: rgba(190,220,255,.8); transform: translateY(-50%) scale(1.03); }
 .hero-brief[style*="translateX(-100%)"]:hover { transform: translateY(-50%) translateX(-100%) scale(1.03); }
 .hero-brief-tag {
-  font-size: 8px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase;
-  color: rgba(150,195,255,.72);
+  font-size: 9.5px; font-weight: 700; letter-spacing: .32em; text-transform: uppercase;
+  color: rgba(165,205,255,.8);
 }
 .hero-brief-name {
-  font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
-  text-shadow: 0 0 18px rgba(120,170,255,.55);
+  font-size: 17px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
+  text-shadow: 0 0 22px rgba(120,170,255,.7);
 }
-.hero-brief-go { font-size: 13px; color: rgba(150,195,255,.85); }
+.hero-brief-go { font-size: 16px; color: rgba(175,210,255,.95); }
 
 @media (prefers-reduced-motion: reduce) {
   .hero-cue-line, .hero-brief, .hero-cue-core { animation: none !important; }
@@ -305,3 +306,28 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .eco-activate, .eco-activate::after { animation: none; }
 }
+
+/* ── Launchpad headline ─────────────────────────────────────────────────
+   A soft plate behind the type so it lifts off the architecture without
+   covering it, and it arrives rather than simply being there. */
+@keyframes ctaHeadIn {
+  from { opacity: 0; transform: translateY(18px); filter: blur(6px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+.cta-headline {
+  position: relative;
+  animation: ctaHeadIn 1.5s .35s cubic-bezier(.16,.84,.44,1) both;
+}
+.cta-headline::before {
+  content: "";
+  position: absolute;
+  inset: -14% -9% -18% -12%;
+  z-index: -1;
+  border-radius: 50%;
+  /* barely there — just enough to hold the type off the metal */
+  background: radial-gradient(60% 55% at 62% 48%,
+              rgba(255,255,255,.78) 0%, rgba(255,255,255,.42) 45%, rgba(255,255,255,0) 78%);
+  filter: blur(26px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) { .cta-headline { animation: none; } }

@@ -64,18 +64,10 @@ export default function FrameScrubber({
    *  the very next canvas wipe paint flat background instead of real footage. */
   const lastImgRef = useRef<HTMLImageElement | null>(null);
 
-  // ── LOADING: A MOVING WINDOW, NOT THE WHOLE FILM ──────────────────────
-  //  The old loader asked for every frame at once. For the journey and the
-  //  void together that is 2,126 images and, decoded, several GIGABYTES of
-  //  bitmap. The browser decodes those on the main thread, which is exactly
-  //  where the picture is drawn — measured, 4.3% of frames fell below 30fps
-  //  with stalls up to 160ms, and that is the lag you can feel.
-  //
-  //  So: the proxy strip is small enough to fetch whole (it is what guarantees
-  //  something is always on screen), but FULL-RESOLUTION frames are only
-  //  fetched in a window around wherever the visitor actually is. Scrolling
-  //  drags the window along. Nothing far away is ever decoded, so nothing
-  //  competes with the frame you are looking at.
+  // ── LOADING, IN THREE PASSES ──────────────────────────────────────────
+  //  1. the whole proxy strip, so there is always something real to draw
+  //  2. the frames the film STOPS on, at full resolution, ahead of the rest
+  //  3. everything else, nearest-to-the-visitor first
   useEffect(() => {
     if (!frameUrls?.length) return;
     const N = frameUrls.length;
@@ -117,22 +109,23 @@ export default function FrameScrubber({
     // 2. the frames the film actually stops on, at full res, first
     (priority ?? []).forEach((i) => into(imagesRef.current, frameUrls[i], i, tick));
 
-    // 3. full res only AROUND the visitor, following them as they move
-    const BEHIND = 40, AHEAD = 110, PER_TICK = 4;
-    const chase = () => {
-      if (cancelled) return;
+    // 3. NEAREST FIRST, then everything — but all of it, eventually.
+    //    A pure moving window was tried and reverted: it could not keep up with
+    //    a fast scrub, so the picture lagged behind the scroll and the callout
+    //    sat on a frame the canvas had not reached yet. It also did not buy the
+    //    performance — the stutter was the nav bar reading canvas pixels, and
+    //    with that gone this decodes comfortably in the background.
+    const order = frameUrls.map((_, i) => i).filter((i) => !(priority ?? []).includes(i));
+    const pumpFull = () => {
+      if (cancelled || !order.length) return;
+      // whatever is closest to the visitor goes first, so the frames they are
+      // about to see are always the ones being fetched
       const f = Math.round(Math.min(1, Math.max(0, progressRef.current)) * (N - 1));
-      let budget = PER_TICK;
-      for (let d = 0; d <= AHEAD && budget > 0; d++) {
-        for (const i of d === 0 ? [f] : [f + d, f - d]) {
-          if (i < 0 || i >= N) continue;
-          if (d > BEHIND && i < f) continue;             // do not chase backwards far
-          if (!imagesRef.current[i]) { into(imagesRef.current, frameUrls[i], i, tick); if (--budget <= 0) break; }
-        }
-      }
-      setTimeout(chase, 90);
+      order.sort((a, b) => Math.abs(a - f) - Math.abs(b - f));
+      order.splice(0, 5).forEach((i) => into(imagesRef.current, frameUrls[i], i, tick));
+      setTimeout(pumpFull, 55);
     };
-    chase();
+    pumpFull();
 
     return () => { cancelled = true; };
   }, [frameUrls, proxyUrls, priority, readyRef, progressRef]);

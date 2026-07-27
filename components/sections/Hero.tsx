@@ -6,6 +6,7 @@ import { HERO, JOURNEY } from "@/lib/copy";
 import SplitChars from "@/components/ui/SplitChars";
 import FrameScrubber from "@/components/ui/FrameScrubber";
 import { createScrubCatch } from "@/lib/beatGate";
+import { createScrollGovernor } from "@/lib/scrollGovernor";
 
 /**
  * Cinematic scroll-journey hero — one continuous 7-beat sequence scrubbed by
@@ -80,15 +81,35 @@ const proxyUrls = Array.from(
    still walking and the check-in kiosk is not yet readable. */
 const SRC_W = 1920, SRC_H = 1080;
 const SCENE_LINKS = [
-  { product: "Loops",     frame:  54, from:  22, to:  63, x:  981, y: 527, dx:  178, dy: -128 },
-  { product: "Connect",   frame: 107, from:  86, to: 130, x:  807, y: 378, dx:  174, dy: -142 },
-  { product: "Trainer",   frame: 178, from: 160, to: 198, x: 1013, y: 433, dx:  186, dy: -150 },
-  { product: "Companion", frame: 240, from: 221, to: 262, x:  276, y: 600, dx:  186, dy: -232 },
-  { product: "Station",   frame: 304, from: 290, to: 321, x:  919, y: 429, dx: -236, dy: -152 },
-  { product: "Studio",    frame: 368, from: 350, to: 389, x: 1532, y: 337, dx: -224, dy: -104 },
-  { product: "Fuel",      frame: 430, from: 412, to: 443, x:  940, y: 540, dx: -204, dy: -184 },
-  { product: "Market",    frame: 458, from: 444, to: 468, x:  960, y: 550, dx: -214, dy: -192 },
+  { product: "Loops",     frame:  54, x:  948, y: 516, vx:   7.1, vy:  6.0, dx:  178, dy: -128 },
+  { product: "Connect",   frame: 107, x:  807, y: 378, vx:   3.1, vy:  1.8, dx:  174, dy: -142 },
+  { product: "Trainer",   frame: 178, x:  990, y: 436, vx:   1.7, vy: -0.9, dx:  186, dy: -150 },
+  { product: "Companion", frame: 240, x:  276, y: 600, vx: -17.3, vy:  4.0, dx:  186, dy: -232 },
+  { product: "Station",   frame: 304, x:  919, y: 429, vx:   9.2, vy:  0.7, dx: -236, dy: -152 },
+  { product: "Studio",    frame: 368, x: 1356, y: 374, vx:  19.1, vy: -4.4, dx: -224, dy: -104 },
+  { product: "Fuel",      frame: 430, x:  940, y: 540, vx:   3.9, vy: -2.4, dx: -204, dy: -184 },
+  { product: "Market",    frame: 458, x:  960, y: 550, vx:  13.7, vy:  6.6, dx: -214, dy: -192 },
 ];
+
+/** How many frames either side of the catch the callout is on screen. Tight,
+ *  because it TRACKS the object rather than sitting at a fixed spot, and a
+ *  straight-line track only holds for so long. */
+const LINK_SPAN = 14;
+
+/* ── THE CALLOUT FOLLOWS THE OBJECT ───────────────────────────────────────
+   The camera moves, so the thing a link points at moves with it. A fixed
+   coordinate is only right on the catch frame; a few frames either side the
+   node has slid off and the callout looks like it came from nowhere — worst on
+   Studio, Station and Fuel, exactly the three that were reported.
+
+   `vx`/`vy` are how far that object actually travels per frame, measured by
+   template-matching the object across ±10 frames around its catch. Studio
+   moves 19px a frame, Companion −17px. The node is placed by extrapolating
+   along that line from the catch, so it stays on the object as the shot moves. */
+function linkAt(link: (typeof SCENE_LINKS)[number], frame: number) {
+  const d = frame - link.frame;
+  return { x: link.x + link.vx * d, y: link.y + link.vy * d };
+}
 
 /** map a source-space point to screen, matching object-fit: cover */
 function coverPoint(vw: number, vh: number, sx: number, sy: number) {
@@ -143,6 +164,15 @@ export default function Hero() {
    *  NOT named `stop` — that resolves to the global `window.stop`. */
   /** which scene's callout is on screen, by FRAME — not by catch */
   const [sceneIdx, setSceneIdx] = useState(-1);
+  /** the frame the callout should track to, updated every scroll tick */
+  const frameRef = useRef(0);
+  const [, force] = useState(0);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => { force((n) => n + 1); raf = requestAnimationFrame(tick); };
+    if (sceneIdx >= 0) raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [sceneIdx]);
   const [vp, setVp] = useState({ w: 0, h: 0 });
   /** frames decoded so far — kept for the scrubber's readiness reporting */
   const framesReady = useRef(0);
@@ -190,7 +220,8 @@ export default function Hero() {
         onUpdate: (self) => {
           progressRef.current = self.progress;
           const f = self.progress * LAST;
-          const i = SCENE_LINKS.findIndex((s) => f >= s.from && f <= s.to);
+          frameRef.current = f;
+          const i = SCENE_LINKS.findIndex((s) => Math.abs(f - s.frame) <= LINK_SPAN);
           setSceneIdx((prev) => (prev === i ? prev : i));
         },
       });
@@ -296,14 +327,23 @@ export default function Hero() {
     // 4. THE GATE. Mounted after the scrubbed rig above, deliberately: the gate
     //    animates SCROLL rather than frames, so every rule built above keeps
     //    driving itself off its own ScrollTrigger with nothing to keep in sync.
+    let caught = false;
     const gate = createScrubCatch({
       section,
       anchors: ANCHORS,
-      onCatch: () => {},
-      onRelease: () => {},
+      onCatch: () => { caught = true; },
+      onRelease: () => { caught = false; },
+    });
+    // An even tempo between the products, whatever the hand does. The catches
+    // decide WHERE it stops; this decides how fast it travels in between —
+    // previously that was entirely down to how hard you flicked, and the arrow
+    // keys jumped a whole scene at a time.
+    const governor = createScrollGovernor({
+      section, maxPxPerSec: 430, keyStep: 400, paused: () => caught,
     });
 
     return () => {
+      governor.destroy();
       gate.destroy();
       if (onMove) section.removeEventListener("pointermove", onMove);
       ctx.revert();
@@ -361,7 +401,8 @@ export default function Hero() {
                shot; the catch holds you on it long enough to click. */}
         {vp.w > 0 && sceneIdx >= 0 && SCENE_LINKS[sceneIdx] && (() => {
           const link = SCENE_LINKS[sceneIdx];
-          const pt = coverPoint(vp.w, vp.h, link.x, link.y);
+          const tracked = linkAt(link, frameRef.current);
+          const pt = coverPoint(vp.w, vp.h, tracked.x, tracked.y);
           const lx = pt.left + link.dx * pt.scale;
           const ly = pt.top + link.dy * pt.scale;
           const leftward = link.dx < 0;

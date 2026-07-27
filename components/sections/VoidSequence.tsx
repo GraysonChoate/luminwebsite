@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { gsap, ScrollTrigger } from "@/lib/motion";
 import FrameScrubber from "@/components/ui/FrameScrubber";
-import { createScrubCatch } from "@/lib/beatGate";
+import { createScrollGovernor } from "@/lib/scrollGovernor";
 
 /**
  * The White Void — the last scrollable section of the site.
@@ -72,7 +72,9 @@ const SLOTS: { side: "L" | "R"; html: string }[] = [
   { side: "R", html: `We didn't study the problem.<br>We ran the floor.` },
   { side: "L", html: `The workout was never<br>the hard part. Coming back was.` },
   { side: "R", html: `So we built the system<br>behind every destination.` },
-  { side: "L", html: `Now come build yours.` },
+  // RIGHT side: the Launchpad has risen on the left of frame by this point,
+  // and the last line was landing straight on top of it.
+  { side: "R", html: `Now come build yours.` },
 ];
 /** one width for all of them, wide enough for the longest line at full size so
  *  nothing wraps into a third line and collides with its neighbour */
@@ -90,13 +92,6 @@ const VP_X = 0.660, VP_Y = 0.294;
 /** where a line ends up: a fraction of the viewport, and just below centre so
  *  it sits over the floor rather than the bright upper haze */
 const REST_X_L = 0.29, REST_X_R = 0.71, REST_Y = 0.55;
-
-/** Each line eases to a stop as it reaches the lens. NOT the hard snap the
- *  journey uses — the copy is still travelling here, so a jump reads as a jolt.
- *  It glides in over 0.4s, holds, and carries on by itself. Without any pacing
- *  a single flick crossed the ENTIRE void: measured, one swipe took progress
- *  from 0.23 to 1.0 and all five lines were gone. */
-const CATCH_SOFT_MS = 400, CATCH_HOLD_MS = 1300;
 
 /** Copy runs between these two points of section progress.
  *  CONTINUE JOURNEY lands at the end of the mapping transition (0.229). The
@@ -159,7 +154,7 @@ export default function VoidSequence() {
       section.style.pointerEvents = armed ? "auto" : "none";
     }
 
-    let catcher: ReturnType<typeof createScrubCatch> | null = null;
+    let governor: ReturnType<typeof createScrollGovernor> | null = null;
 
     const ctx = gsap.context(() => {
       // 0. entry guard — spans the whole time the section touches the viewport,
@@ -223,15 +218,11 @@ export default function VoidSequence() {
         },
       });
 
-      // 2. hold each line as it lands, gently
-      catcher = createScrubCatch({
-        section,
-        anchors: SLOTS.map((_, i) => FIRST + i * GAP),
-        softMs: CATCH_SOFT_MS,
-        holdMs: CATCH_HOLD_MS,
-        onCatch: () => {},
-        onRelease: () => {},
-      });
+      // 2. NO SNAP. The lines are paced by a speed limit instead: the section
+      //    advances at its own tempo however hard you swipe, so each line has
+      //    time to grow, arrive and fly past without the page ever grabbing
+      //    you. Slower than the journey — this is reading, not watching.
+      governor = createScrollGovernor({ section, maxPxPerSec: 300, keyStep: 320 });
 
       // 3. arrival — scroll's last job on this site. Hand off to the CTA.
       ScrollTrigger.create({
@@ -249,7 +240,7 @@ export default function VoidSequence() {
       });
     }, section);
 
-    return () => { catcher?.destroy(); ctx.revert(); planes.forEach((p) => p.remove()); };
+    return () => { governor?.destroy(); ctx.revert(); planes.forEach((p) => p.remove()); };
   }, [reduced]);
 
   return (

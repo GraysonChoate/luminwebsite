@@ -668,14 +668,11 @@ export default function EcosystemSequence() {
 
         {/* "Product Suites" — the embedded link that sits on the plate once the
             orb is at rest in the floor, before the activation is fired. */}
-        {/* Centred, and lifted just clear of the glow on the floor so the
-            button reads as hovering over the resting orb rather than sitting
-            on it. */}
+        {/* DEAD CENTRE of the screen. It was lifted well above centre, which
+            reads as off on a big window where there is more room above it. */}
         <div
-          className="absolute inset-x-0 z-[3] flex justify-center"
+          className="absolute inset-0 z-[3] flex items-center justify-center"
           style={{
-            top: "50%",
-            transform: "translateY(-140%)",
             opacity: suitesOn ? 1 : 0,
             pointerEvents: suitesOn ? "auto" : "none",
             transition: "opacity 0.7s ease",

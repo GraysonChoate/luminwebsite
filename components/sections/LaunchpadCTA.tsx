@@ -157,10 +157,7 @@ const FIELDS: Field[] = [
 ];
 
 const HEADLINE = "Build the operation you've always wanted.";
-const SUB = [
-  "Run smarter. Grow stronger. Give members every reason to stay.",
-  "Tell us where you are today. We'll map the way forward.",
-];
+
 
 type Phase = "hidden" | "idle" | "launching" | "orbit";
 
@@ -198,6 +195,20 @@ export default function LaunchpadCTA() {
     (f) => (values[f.id] ?? []).some((v) => v.trim()) && (f.type === "choice" || committed[f.id]),
   ).length;
   const charged = filled === FIELDS.length;
+
+  /** Close an open picker on any click outside it. The multi-select sheet
+   *  stayed open over the button — you could see LAUNCH and could not press
+   *  it, because the sheet was swallowing the click. */
+  useEffect(() => {
+    if (!openPicker) return;
+    const away = (e: MouseEvent) => {
+      const el = e.target as HTMLElement;
+      if (!el.closest?.("[data-picker]")) setOpenPicker(null);
+    };
+    // `capture` so it runs before the option buttons stop propagation
+    document.addEventListener("mousedown", away, true);
+    return () => document.removeEventListener("mousedown", away, true);
+  }, [openPicker]);
 
   /* ── take over when the void arrives ─────────────────────────────────── */
   useEffect(() => {
@@ -345,7 +356,12 @@ export default function LaunchpadCTA() {
               <div key={f.id} className="absolute" style={{ left: r.left, top: r.top, width: r.width, height: r.height }}>
                 <span
                   className="type-eyebrow absolute -translate-y-full text-[9px]"
-                  style={{ top: -4, left: 2, color: done ? "rgba(255,255,255,0.85)" : "rgba(33,33,33,0.48)" }}
+                  style={{
+                    top: -4, left: 2,
+                    color: done ? "rgba(255,255,255,0.85)" : "rgba(33,33,33,0.48)",
+                    // a picker carries its question inside the row instead
+                    opacity: f.type === "choice" ? 0 : 1,
+                  }}
                 >
                   {f.label}
                   {hasText && !done && f.type === "email" && !EMAIL_OK.test(picked[0] ?? "") && (
@@ -360,7 +376,7 @@ export default function LaunchpadCTA() {
                 </span>
 
                 {f.type === "choice" ? (
-                  <>
+                  <div data-picker className="contents">
                     {/* The row itself is the trigger. The options CANNOT live
                         inside it — the baked box is one 67px line tall — so they
                         open as a sheet anchored to the row. */}
@@ -370,8 +386,10 @@ export default function LaunchpadCTA() {
                       className="flex h-full w-full items-center justify-between bg-transparent px-4 text-left outline-none"
                       style={{ color: done ? "#fff" : "var(--c-cosmos)", fontSize: ink }}
                     >
-                      <span className="truncate">
-                        {done ? picked.join(", ") : ""}
+                      {/* the question sits ON the row until it is answered,
+                          then the answer takes its place */}
+                      <span className="truncate" style={{ opacity: done ? 1 : 0.55 }}>
+                        {done ? picked.join(", ") : f.label}
                       </span>
                       <span
                         className="ml-3 shrink-0 transition-transform"
@@ -450,7 +468,7 @@ export default function LaunchpadCTA() {
                         )}
                       </div>
                     )}
-                  </>
+                  </div>
                 ) : (
                 <input
                   type={f.type}
@@ -516,13 +534,19 @@ export default function LaunchpadCTA() {
         </form>
       )}
 
-      {/* ── the copy. right-side negative space, stays until submit ────── */}
+      {/* ── the headline ────────────────────────────────────────────────
+             On its own now. The two sub-lines underneath sat on the hologram
+             and were hard to read, and the heading used to just BE there —
+             it fades up with a soft plate behind it so it lifts off the
+             architecture without covering it. */}
       {phase === "idle" && (
-        <div className="pointer-events-none absolute right-[6vw] top-[16%] z-10 w-[min(34vw,520px)] text-right">
-          <h2 className="type-statement" style={{ color: "var(--c-cosmos)" }}>{HEADLINE}</h2>
-          {SUB.map((s) => (
-            <p key={s} className="type-step mt-4" style={{ color: "#4a4a52" }}>{s}</p>
-          ))}
+        <div className="pointer-events-none absolute right-[6vw] top-[16%] z-10 w-[min(38vw,600px)] text-right">
+          <h2
+            className="type-statement cta-headline"
+            style={{ color: "var(--c-cosmos)" }}
+          >
+            {HEADLINE}
+          </h2>
         </div>
       )}
 

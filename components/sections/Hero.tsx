@@ -42,7 +42,15 @@ const frameUrls = (variant: "desktop" | "mobile") =>
    0.34 to 0.68 of a beat). Travel therefore carries you through the seams and
    lands on the money frame. Stop 0 is the opening orb, whose own 300px
    transition has to clear before the journey is visible — hence the 0.09 floor. */
-const DWELL = JOURNEY.beats.map((b) => (b.frames[0] + b.frames[1]) / 2 / LAST);
+/** SCENE DWELL FRAMES, read off the footage rather than off JOURNEY.beats.
+ *  The seams were found by luminance (every scene ends in a dissolve to black,
+ *  mean < 26): 1-17, 66-81, 133-155, 201-216, 265-285, 324-345, 392-408,
+ *  471-478. That leaves seven lit scenes — but the LAST one holds two distinct
+ *  moments, the guy with his phone in the supplement area and then the walk to
+ *  the counter, which is why the walkthrough has eight products and only seven
+ *  captions. Each number below sits well inside its scene, clear of both seams. */
+const DWELL_FRAMES = [41, 107, 178, 240, 304, 368, 430, 458];
+const DWELL = DWELL_FRAMES.map((f) => f / LAST);
 const STOPS = [0, Math.max(DWELL[0], 0.09), ...DWELL.slice(1)];
 /** every hop runs at 24fps — duration is the frame distance, never a guess */
 const DURATIONS = STOPS.slice(0, -1).map((s, i) => ((STOPS[i + 1] - s) * LAST) / 24);
@@ -60,13 +68,14 @@ const DURATIONS = STOPS.slice(0, -1).map((s, i) => ((STOPS[i + 1] - s) * LAST) /
    Labels flip to the left of the node when the anchor is near the right edge. */
 const SRC_W = 1920, SRC_H = 1080;
 const SCENE_LINKS = [
-  { beat: "check-in",       product: "Core",    x: 1120, y: 405 },
-  { beat: "consultation",   product: "Connect", x: 1740, y: 675 },
-  { beat: "assessment",     product: "Move",    x: 1120, y: 675 },
-  { beat: "training-floor", product: "Loops",   x: 1740, y: 675 },
-  { beat: "station",        product: "Market",  x: 1440, y: 675 },
-  { beat: "studio",         product: "Academy", x: 1740, y: 405 },
-  { beat: "fuel",           product: "Fuel",    x: 1440, y: 675 },
+  { beat: "check-in",  product: "Loops",     x: 1120, y: 405 },
+  { beat: "sales",     product: "Connect",   x: 1740, y: 675 },
+  { beat: "pt-floor",  product: "Trainer",   x: 1120, y: 675 },
+  { beat: "gym-floor", product: "Companion", x: 1740, y: 675 },
+  { beat: "station",   product: "Station",   x: 1440, y: 675 },
+  { beat: "studio",    product: "Studio",    x: 1740, y: 405 },
+  { beat: "fuel",      product: "Fuel",      x: 1440, y: 675 },
+  { beat: "market",    product: "Market",    x: 1120, y: 405 },
 ];
 
 /** map a source-space point to screen, matching object-fit: cover */
@@ -111,6 +120,9 @@ export default function Hero() {
    *  NOT named `stop` — that resolves to the global `window.stop`. */
   const [stopIdx, setStopIdx] = useState(0);
   const [vp, setVp] = useState({ w: 0, h: 0 });
+  /** frames decoded so far — the gate will not step past them */
+  const framesReady = useRef(0);
+  const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
     const on = () => setVp({ w: window.innerWidth, h: window.innerHeight });
@@ -262,8 +274,14 @@ export default function Hero() {
       section,
       stops: STOPS,
       durations: DURATIONS,
-      onSettle: (i) => setStopIdx(i),
+      onSettle: (i) => { setStopIdx(i); setStalled(false); },
       onTravel: () => setStopIdx(-1),
+      // Refuse to step into footage the browser has not decoded. 478 frames is
+      // ~33MB; a gated hop demands 65 of them at 24fps the instant you gesture,
+      // where free scrubbing used to give the loader time to keep up. Without
+      // this the journey plays to a blank canvas — scenes "cut out".
+      canAdvance: (to) => Math.ceil(STOPS[to] * LAST) + 8 <= framesReady.current,
+      onStall: () => setStalled(true),
     });
 
     return () => {
@@ -284,6 +302,7 @@ export default function Hero() {
             frameCount={FRAME_COUNT}
             frameUrls={frameUrls(variant)}
             fit="cover"
+            readyRef={framesReady}
           />
         </div>
 

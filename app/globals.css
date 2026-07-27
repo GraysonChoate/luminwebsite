@@ -174,3 +174,61 @@ body {
 @media (prefers-reduced-motion: reduce) {
   [style*="heroLinkIn"] { animation: none !important; opacity: 1 !important; }
 }
+
+/* ── ecosystem idle controls ────────────────────────────────────────────
+   Instrumentation, not buttons. The hologram is the hero here, so these are
+   hairline capsules that hold their own without competing: no fill on the
+   secondary, a thin luminous edge on the primary, and letterspacing that opens
+   slightly on hover so the control feels alive rather than animated. */
+.eco-ctl {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7em;
+  padding: 0.95rem 1.7rem;
+  border-radius: 999px;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: color .45s ease, border-color .45s ease, background .45s ease,
+              letter-spacing .45s ease, box-shadow .45s ease;
+}
+.eco-ctl:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.07);
+  letter-spacing: 0.3em;
+}
+.eco-ctl-arrow { opacity: .45; transition: opacity .45s ease, transform .45s ease; }
+.eco-ctl:hover .eco-ctl-arrow { opacity: 1; }
+.eco-ctl.group:hover .eco-ctl-arrow:last-child { transform: translateX(3px); }
+.eco-ctl.group:hover .eco-ctl-arrow:first-child { transform: translateX(-3px); }
+
+/* primary: still no flat fill — a luminous rim and a soft interior bloom */
+.eco-ctl-primary {
+  color: #fff;
+  border-color: rgba(120, 150, 255, 0.55);
+  background:
+    radial-gradient(120% 180% at 50% 120%, rgba(82, 112, 255, 0.55) 0%, rgba(82, 112, 255, 0.10) 60%, transparent 100%);
+  box-shadow: 0 0 0 1px rgba(82, 112, 255, 0.16), 0 10px 40px -12px rgba(82, 112, 255, 0.75);
+}
+.eco-ctl-primary:hover {
+  border-color: rgba(160, 185, 255, 0.85);
+  box-shadow: 0 0 0 1px rgba(82, 112, 255, 0.3), 0 14px 52px -12px rgba(82, 112, 255, 0.95);
+}
+/* the hairline that separates back from forward */
+.eco-ctl-rule {
+  width: 34px; height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.28), rgba(255,255,255,0));
+}
+@media (max-width: 640px) {
+  .eco-ctl { padding: 0.8rem 1.15rem; font-size: 9.5px; letter-spacing: 0.18em; }
+  .eco-ctl-rule { width: 14px; }
+}

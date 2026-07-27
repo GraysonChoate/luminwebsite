@@ -51,11 +51,17 @@ type Opts = {
   onSettle?: (i: number) => void;
   /** fired when a hop starts */
   onTravel?: (from: number, to: number) => void;
+  /** Veto a hop when its footage is not decoded yet. Returning false IGNORES
+   *  the gesture rather than releasing — stepping into unfetched frames is what
+   *  made the journey look like it was cutting scenes out. */
+  canAdvance?: (to: number) => boolean;
+  /** told when a gesture was vetoed, so the UI can say "loading" */
+  onStall?: () => void;
 };
 
 const KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Spacebar"]);
 
-export function createBeatGate({ section, stops, durations, onSettle, onTravel }: Opts): BeatGate {
+export function createBeatGate({ section, stops, durations, onSettle, onTravel, canAdvance, onStall }: Opts): BeatGate {
   let idx = 0;
   let travelling = false;
   let engaged = false;
@@ -120,6 +126,7 @@ export function createBeatGate({ section, stops, durations, onSettle, onTravel }
     if (travelling) return true;                       // consumed, ignored
     const next = idx + dir;
     if (next < 0 || next >= stops.length) return false; // BOUNDARY RELEASE
+    if (canAdvance && !canAdvance(next)) { onStall?.(); return true; } // hold
     travelling = true;
     freeze();
     onTravel?.(idx, next);

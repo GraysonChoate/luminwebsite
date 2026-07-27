@@ -436,35 +436,33 @@ export default function EcosystemSequence() {
         {/* Exit controls, not a scroll hint. They appear only once the
             activation has finished and the lock is released. */}
         <div
-          className="absolute inset-x-0 bottom-10 z-[3] flex items-center justify-center gap-4 px-6"
+          className="absolute inset-x-0 bottom-10 z-[3] flex items-center justify-center gap-5 px-6"
           style={{
             opacity: cueOn ? 1 : 0,
             pointerEvents: cueOn ? "auto" : "none",
             transition: "opacity 0.8s ease",
           }}
         >
+          {/* Deliberately NOT two chunky pills. At this moment the hologram is
+              the hero and the controls are instrumentation: hairline capsules,
+              wide tracking, a single hairline rule between them. Weight comes
+              from the mark and the glow, not from fill. */}
           <button
             type="button"
             onClick={() => navRef.current?.goBack()}
-            className="font-nav rounded-full px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white transition-colors"
-            style={{
-              background: "rgba(255,255,255,0.07)",
-              border: "1px solid rgba(255,255,255,0.22)",
-              backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)",
-            }}
+            className="eco-ctl group"
           >
+            <span className="eco-ctl-arrow" aria-hidden="true">←</span>
             {BACK_LABEL}
           </button>
+          <span className="eco-ctl-rule" aria-hidden="true" />
           <button
             type="button"
             onClick={() => navRef.current?.goForward()}
-            className="font-nav rounded-full px-7 py-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-white transition-transform hover:scale-[1.03]"
-            style={{
-              background: "var(--c-supernova)",
-              boxShadow: "0 0 34px rgba(82,112,255,0.55)",
-            }}
+            className="eco-ctl eco-ctl-primary group"
           >
             {FORWARD_LABEL}
+            <span className="eco-ctl-arrow" aria-hidden="true">→</span>
           </button>
         </div>
 

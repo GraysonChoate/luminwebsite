@@ -27,6 +27,7 @@ export default function FrameScrubber({
   className,
   fit = "cover",
   background = "#050508",
+  readyRef,
 }: {
   progressRef: React.MutableRefObject<number>;
   frameCount?: number;
@@ -34,6 +35,13 @@ export default function FrameScrubber({
   className?: string;
   fit?: "cover" | "contain";
   background?: string;
+  /** Written with the highest CONTIGUOUS decoded frame index + 1, i.e. "every
+   *  frame below this is safe to draw". Deliberately not a raw completion
+   *  count: requests go out in order but finish out of order, so a count of 300
+   *  does not mean frame 300 exists — gating on the count still let the journey
+   *  step onto an undecoded frame and paint nothing. A ref, not state, because
+   *  478 frames would otherwise mean 478 re-renders. */
+  readyRef?: React.MutableRefObject<number>;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imagesRef = useRef<(HTMLImageElement | null)[]>([]);
@@ -43,10 +51,19 @@ export default function FrameScrubber({
     if (!frameUrls?.length) return;
     imagesRef.current = new Array(frameUrls.length).fill(null);
     let cancelled = false;
+    const done = new Array(frameUrls.length).fill(false);
+    let edge = 0;                       // highest contiguous decoded index + 1
+    const tick = (i: number) => {
+      done[i] = true;
+      while (done[edge]) edge++;
+      if (readyRef) readyRef.current = edge;
+    };
     const load = (i: number) => {
       const img = new Image();
       img.src = frameUrls[i];
-      img.decode?.().catch(() => {});
+      const ok = () => tick(i);
+      if (img.decode) img.decode().then(ok, () => { img.onload = ok; img.onerror = ok; });
+      else { img.onload = ok; img.onerror = ok; }
       imagesRef.current[i] = img;
     };
     load(0);
@@ -92,7 +109,13 @@ export default function FrameScrubber({
         ctx.fillRect(0, 0, cw, ch);
       } else {
         s = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
-        ctx.clearRect(0, 0, cw, ch);
+        // FILL, never clear. clearRect left the canvas fully transparent
+        // whenever a resize wiped it and the next frame was not yet decoded —
+        // which read as the footage "cutting out and turning grey". A cover
+        // draw covers the whole canvas anyway, so this only ever shows during
+        // that gap, and it shows the section colour instead of a hole.
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, cw, ch);
       }
       const w = img.naturalWidth * s, h = img.naturalHeight * s;
       ctx.drawImage(img, (cw - w) / 2, (ch - h) / 2, w, h);

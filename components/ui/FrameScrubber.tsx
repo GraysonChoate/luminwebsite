@@ -59,6 +59,7 @@ export default function FrameScrubber({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imagesRef = useRef<(HTMLImageElement | null)[]>([]);
   const proxyRef = useRef<(HTMLImageElement | null)[]>([]);
+  const loadedSigRef = useRef<string | null>(null);
   /** last frame actually PAINTED. A ref, not an effect local: the draw effect
    *  re-runs on prop changes, and an effect-local would reset to null and let
    *  the very next canvas wipe paint flat background instead of real footage. */
@@ -70,6 +71,12 @@ export default function FrameScrubber({
   //  3. everything else, nearest-to-the-visitor first
   useEffect(() => {
     if (!frameUrls?.length) return;
+    // Never restart for a strip we are already loading. A caller that rebuilds
+    // its URL array each render would otherwise re-download the entire film,
+    // repeatedly — which is exactly what happened.
+    const sig = `${frameUrls.length}|${frameUrls[0]}`;
+    if (loadedSigRef.current === sig) return;
+    loadedSigRef.current = sig;
     const N = frameUrls.length;
     imagesRef.current = new Array(N).fill(null);
     proxyRef.current = new Array(N).fill(null);
@@ -106,18 +113,39 @@ export default function FrameScrubber({
       pumpProxy();
     }
 
-    // 2. the frames the film actually stops on, at full res, first
-    (priority ?? []).forEach((i) => into(imagesRef.current, frameUrls[i], i, tick));
-
-    // 3. NEAREST FIRST, then everything — but all of it, eventually.
+    // 3. FULL RESOLUTION WAITS UNTIL THE SECTION IS NEARLY IN VIEW.
+    //    Every strip used to start downloading the moment the page loaded, so
+    //    just sitting on the opening pulled 95MB — the white void's 32MB and
+    //    the activation's 12MB racing the frames actually on screen. They now
+    //    hold until the section is within a screen and a half.
+    //
+    //    NEAREST FIRST, then everything — but all of it, eventually.
     //    A pure moving window was tried and reverted: it could not keep up with
     //    a fast scrub, so the picture lagged behind the scroll and the callout
     //    sat on a frame the canvas had not reached yet. It also did not buy the
     //    performance — the stutter was the nav bar reading canvas pixels, and
     //    with that gone this decodes comfortably in the background.
     const order = frameUrls.map((_, i) => i).filter((i) => !(priority ?? []).includes(i));
+    let nearby = false;
+    const near = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { nearby = true; near.disconnect(); } },
+      { rootMargin: "150% 0px" },
+    );
+    if (canvasRef.current) near.observe(canvasRef.current);
+
+    // the frames the film STOPS on, at full res, before any of the rest
+    let primed = false;
+    const primeStops = () => {
+      if (primed) return;
+      primed = true;
+      (priority ?? []).forEach((i) => into(imagesRef.current, frameUrls[i], i, tick));
+    };
+
     const pumpFull = () => {
-      if (cancelled || !order.length) return;
+      if (cancelled) return;
+      if (!nearby) { setTimeout(pumpFull, 250); return; }   // still far away
+      primeStops();
+      if (!order.length) return;
       // whatever is closest to the visitor goes first, so the frames they are
       // about to see are always the ones being fetched
       const f = Math.round(Math.min(1, Math.max(0, progressRef.current)) * (N - 1));
@@ -127,7 +155,7 @@ export default function FrameScrubber({
     };
     pumpFull();
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; near.disconnect(); };
   }, [frameUrls, proxyUrls, priority, readyRef, progressRef]);
 
   useEffect(() => {

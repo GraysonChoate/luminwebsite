@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { gsap, ScrollTrigger } from "@/lib/motion";
 import { HERO, JOURNEY } from "@/lib/copy";
 import SplitChars from "@/components/ui/SplitChars";
@@ -174,6 +174,13 @@ export default function Hero() {
     return () => cancelAnimationFrame(raf);
   }, [sceneIdx]);
   const [vp, setVp] = useState({ w: 0, h: 0 });
+  /** MEMOISED, and it matters enormously. This was built inline in the JSX, so
+   *  every render produced a NEW array — which is a new dependency for the
+   *  scrubber's loading effect, which restarted the whole download. With the
+   *  callout tracking at 60fps that meant re-fetching 478 frames continuously:
+   *  measured 86MB of journey frames pulled for a 30MB strip, and 270MB across
+   *  a single walkthrough. That is the weight that was being felt. */
+  const journeyUrls = useMemo(() => frameUrls(variant), [variant]);
   /** frames decoded so far — kept for the scrubber's readiness reporting */
   const framesReady = useRef(0);
 
@@ -359,7 +366,7 @@ export default function Hero() {
             key={variant}
             progressRef={progressRef}
             frameCount={FRAME_COUNT}
-            frameUrls={frameUrls(variant)}
+            frameUrls={journeyUrls}
             fit="cover"
             readyRef={framesReady}
             proxyUrls={variant === "desktop" ? proxyUrls : undefined}

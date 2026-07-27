@@ -294,13 +294,19 @@ export function createScrubCatch({
   let hardTimer: number | undefined;
   let intent = 0;             // |deltaY| accumulated since arming
   const SILENCE_MS = 320;     // longer than any gap inside a momentum tail
-  const HARD_ARM_MS = 2000;   // …but arm anyway, so it can never deadlock
+  /** Pure deadlock insurance, nothing else. It used to be 2000, which fired
+   *  while a hard flick's tail was STILL RUNNING — so the flick released the
+   *  catch it had just made and rolled straight on to the next product. One
+   *  swipe burned two. Tails are spent by ~3s, so 4000 is past all of them. */
+  const HARD_ARM_MS = 4000;
+  /** Only count events big enough to be a hand, not a dying tail. */
+  const MIN_COUNT_DELTA = 20;
   /** Measured, not guessed: after the hard arm fires, the remaining tail of a
    *  peak-160 flick contributes ~62px and a peak-500 flick ~104px. A person
    *  actively scrolling puts down 60px in a tick or two. 200 sits above every
    *  tail and below any real scroll, so a flick can never release its own
    *  catch and a scroller is never held for more than a beat. */
-  const INTENT_PX = 200;
+  const INTENT_PX = 600;
   const KEY_HOLD_MS = 1200;   // a keypress is one gesture; give it a real dwell
 
   const span = () => Math.max(1, section.offsetHeight - window.innerHeight);
@@ -419,7 +425,8 @@ export function createScrubCatch({
   const onWheel = (e: WheelEvent) => {
     if (held < 0) return;
     if (armed) {
-      intent += Math.abs(e.deltaY);
+      const d = Math.abs(e.deltaY);
+      if (d >= MIN_COUNT_DELTA) intent += d;
       if (intent >= INTENT_PX) { letGo(); return; }
       return;
     }

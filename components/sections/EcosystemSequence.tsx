@@ -95,7 +95,8 @@ const HOLD_MS = 700;
 /** the descent's authored length — 144 frames at 24fps */
 const DESCENT_S = 6.0417;
 /** how long "Product Suites" sits on the plate before the hub takes over */
-const SUITES_DWELL_MS = 1500;
+/** The descent in two gestures: start, halfway, orb at rest. */
+const DESCENT_STEPS = [0, 0.5, 1].map((f) => f * GATE_AT);
 /** the lock can never outlive this, whatever else happens */
 const LOCK_CEILING_MS = 9000;
 
@@ -107,7 +108,7 @@ const LOCK_CEILING_MS = 9000;
 const BACK_LABEL = "Go back";
 const FORWARD_LABEL = "Continue journey";
 /** the embedded link that appears once the orb is at rest in the floor */
-const SUITES_LABEL = "Product Suites";
+const SUITES_LABEL = "Activate ecosystem";
 
 const SCROLL_KEYS = new Set([
   "ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " ", "Spacebar",
@@ -134,7 +135,15 @@ export default function EcosystemSequence() {
 
   const [cueOn, setCueOn] = useState(false);
   const [suitesOn, setSuitesOn] = useState(false);
-  const navRef = useRef<{ goForward: () => void; goBack: () => void } | null>(null);
+  const navRef = useRef<{ goForward: () => void; goBack: () => void; activate: () => void } | null>(null);
+  /** the section currently owns the screen and all input */
+  const heldRef = useRef(false);
+  /** a descent step is mid-flight */
+  const travellingRef = useRef(false);
+  /** which descent step we are parked on */
+  const stepRef = useRef(0);
+  /** a button is taking us out — do not re-seize on the way */
+  const exitingRef = useRef(false);
 
   useEffect(() => {
     const section = sectionRef.current!;
@@ -161,6 +170,23 @@ export default function EcosystemSequence() {
     };
 
     const blockWheel = (ev: Event) => ev.preventDefault();
+    /** Wheel/touch only ever ADVANCE the descent; they never move the page.
+     *  ONE FLICK IS ONE STEP. A time debounce is not enough — a trackpad flick
+     *  runs 2.5s and would clear a 700ms debounce three times over, putting the
+     *  orb in the ground in a single swipe. Same test the journey uses: the
+     *  wheel has to fall silent, and then a real push has to arrive. */
+    let gestureArmed = true;
+    let quietTimer: number | undefined;
+    const onGesture = (ev: Event) => {
+      if (!heldRef.current) return;
+      const dy = Math.abs((ev as WheelEvent).deltaY ?? 999);
+      if (gestureArmed && dy >= 20) {
+        gestureArmed = false;
+        stepDescent();
+      }
+      window.clearTimeout(quietTimer);
+      quietTimer = window.setTimeout(() => { gestureArmed = true; }, 420);
+    };
     const blockKeys = (ev: KeyboardEvent) => {
       if (ev.key === "Escape") { gateTween?.progress(1); return; } // never trap a keyboard user
       if (SCROLL_KEYS.has(ev.key)) ev.preventDefault();
@@ -189,7 +215,65 @@ export default function EcosystemSequence() {
     /** forward: leave the lit hub for the white void. RELEASE is the last
      *  scroll position this section owns, so one tween lands us on the void's
      *  PIN with no reverse scrub in between. */
+    /** Capture the section. Idempotent — safe to call from any trigger. */
+    function seize() {
+      if (heldRef.current || exitingRef.current) return;
+      heldRef.current = true;
+      const pinned = section.offsetHeight - window.innerHeight;
+      // snap to wherever we are in the descent, rounded back to a known step
+      pinnedTo = Math.round(section.offsetTop + pinned * DESCENT_STEPS[stepRef.current]);
+      const lenis = getLenis();
+      lenis?.scrollTo(pinnedTo, { immediate: true, force: true });
+      lenis?.stop();
+      window.scrollTo(0, pinnedTo);
+      ScrollTrigger.update();
+      window.addEventListener("wheel", blockWheel, { passive: false });
+      window.addEventListener("touchmove", blockWheel, { passive: false });
+      window.addEventListener("keydown", blockKeys);
+      window.addEventListener("scroll", holdScroll);
+      window.addEventListener("wheel", onGesture, { passive: true });
+      window.addEventListener("touchend", onGesture, { passive: true });
+    }
+
+    /** One gesture = one step of the descent. Ignored once the orb is down —
+     *  from there the buttons are the only controls. */
+    function stepDescent() {
+      if (!heldRef.current || travellingRef.current) return;
+      if (stepRef.current >= DESCENT_STEPS.length - 1) return;
+      const to = stepRef.current + 1;
+      travellingRef.current = true;
+      const pinned = section.offsetHeight - window.innerHeight;
+      const from = { y: pinnedTo };
+      const target = Math.round(section.offsetTop + pinned * DESCENT_STEPS[to]);
+      gsap.to(from, {
+        y: target,
+        duration: DESCENT_S / (DESCENT_STEPS.length - 1),
+        ease: "none",
+        onUpdate: () => {
+          getLenis()?.stop();
+          pinnedTo = Math.round(from.y);
+          window.scrollTo(0, pinnedTo);
+          ScrollTrigger.update();
+        },
+        onComplete: () => {
+          travellingRef.current = false;
+          stepRef.current = to;
+          if (to === DESCENT_STEPS.length - 1) setSuites(true); // orb is down
+        },
+      });
+    }
+
+    /** the ACTIVATE button — the only thing that starts the ecosystem */
+    function activate() {
+      if (activatedRef.current || travellingRef.current) return;
+      setSuites(false);
+      const pinned = section.offsetHeight - window.innerHeight;
+      fireGate(Math.round(section.offsetTop + pinned * GATE_AT));
+    }
+
     function goForward() {
+      exitingRef.current = true;
+      heldRef.current = false;
       releaseScroll();
       const y = Math.round(section.offsetTop + section.offsetHeight - window.innerHeight);
       const lenis = getLenis();
@@ -200,13 +284,15 @@ export default function EcosystemSequence() {
      *  descent frame, i.e. the gate position — and hand scroll back so they can
      *  keep going up under their own power if they want. */
     function goBack() {
+      exitingRef.current = true;
+      heldRef.current = false;
       releaseScroll();
       const pinned = section.offsetHeight - window.innerHeight;
       const y = Math.round(section.offsetTop + pinned * GATE_AT);
       const lenis = getLenis();
       lenis ? lenis.scrollTo(y, { duration: 1.4 }) : window.scrollTo({ top: y, behavior: "smooth" });
     }
-    navRef.current = { goForward, goBack };
+    navRef.current = { goForward, goBack, activate };
 
     /** Release the input block completely — ONLY the two buttons do this. */
     function releaseScroll() {
@@ -219,9 +305,12 @@ export default function EcosystemSequence() {
       gateTween?.kill();
       window.clearTimeout(ceilingTimer);
       window.removeEventListener("wheel", blockWheel);
+      window.removeEventListener("wheel", onGesture);
+      window.removeEventListener("touchend", onGesture);
       window.removeEventListener("touchmove", blockWheel);
       window.removeEventListener("keydown", blockKeys);
       window.removeEventListener("scroll", holdScroll);
+      window.clearTimeout(quietTimer);
       lockedRef.current = false;
       settledRef.current = false;
       setCue(false);
@@ -342,35 +431,36 @@ export default function EcosystemSequence() {
         },
       });
 
-      // 2. THE DESCENT IS CAUGHT — two scrolls put the orb in the ground.
-      //    A stepper does not work here: the hero's last release hands over
-      //    with live momentum, so the visitor can already be at 0.40 by the
-      //    time this section pins, and a stepper that only engages when pinned
-      //    has nothing left to gate. A CATCH fires on the crossing itself, at
-      //    any arrival speed, and snaps back to the anchor — the same
-      //    primitive the journey uses, already proven against momentum tails.
+      // 2. SCROLL DOES NOT TOUCH THIS SECTION.
+      //    The moment it owns the screen, wheel/touch/keys are captured and
+      //    the page is pinned. Scroll cannot carry you into it, through it, or
+      //    past it — the previous build let a hard swipe run clean past the
+      //    whole ecosystem, because only the activation was locked and the
+      //    descent was still free.
       //
-      //    Anchor 1 is the orb halfway down. Anchor 2 is it at rest in the
-      //    floor, and that one does not wait for a gesture: it shows the
-      //    embedded Product Suites link, holds a beat, then the ecosystem
-      //    takes itself over into the idle hub.
-      descentGate = createScrubCatch({
-        section,
-        anchors: [GATE_AT * 0.5, GATE_AT],
-        onCatch: (i) => {
-          if (i < 1 || activatedRef.current) return;
-          setSuites(true);
-          const pinned = section.offsetHeight - window.innerHeight;
-          handoff = window.setTimeout(() => {
-            descentGate?.destroy();
-            descentGate = null;
-            fireGate(Math.round(section.offsetTop + pinned * GATE_AT));
-          }, SUITES_DWELL_MS);
+      //    Two gestures put the orb in the ground, each playing half the
+      //    descent at its authored 24fps. After that scroll does nothing at
+      //    all: the ACTIVATE button fires the ecosystem, and the two controls
+      //    are the only way out.
+      //    Seize on the FIRST FRAME the section reaches the top, not on a
+      //    toggle. The journey hands over with live momentum, and a toggle can
+      //    land after that momentum has already carried deep into the descent
+      //    — measured, it arrived at 0.458, which IS the gate, so both descent
+      //    gestures were gone before the section ever took control. Watching
+      //    every scroll event over the whole approach closes that window.
+      ScrollTrigger.create({
+        trigger: section,
+        start: "top bottom",
+        end: "bottom top",
+        onUpdate: () => {
+          if (heldRef.current || exitingRef.current) return;
+          if (section.getBoundingClientRect().top <= 0) seize();
         },
-        onRelease: () => {},
-      });
-
-      // 3. the idle clips are small but pointless to fetch early; give them
+        onRefresh: () => {
+          if (heldRef.current || exitingRef.current) return;
+          if (section.getBoundingClientRect().top <= 0) seize();
+        },
+      });      // 3. the idle clips are small but pointless to fetch early; give them
       //    plenty of lead time without competing with the hero's frames.
       ScrollTrigger.create({
         trigger: section,
@@ -541,13 +631,8 @@ export default function EcosystemSequence() {
         >
           <button
             type="button"
-            onClick={() => navRef.current?.goForward()}
-            className="font-nav text-[12px] font-semibold uppercase tracking-[0.3em] text-white"
-            style={{
-              borderBottom: "1px solid rgba(255,255,255,0.5)",
-              paddingBottom: 4,
-              textShadow: "0 2px 24px rgba(10,10,15,0.85)",
-            }}
+            onClick={() => navRef.current?.activate()}
+            className="eco-ctl eco-ctl-primary"
           >
             {SUITES_LABEL}
           </button>

@@ -28,6 +28,8 @@ export default function FrameScrubber({
   fit = "cover",
   background = "#050508",
   readyRef,
+  proxyUrls,
+  priority,
 }: {
   progressRef: React.MutableRefObject<number>;
   frameCount?: number;
@@ -42,52 +44,86 @@ export default function FrameScrubber({
    *  step onto an undecoded frame and paint nothing. A ref, not state, because
    *  478 frames would otherwise mean 478 re-renders. */
   readyRef?: React.MutableRefObject<number>;
+  /** A low-resolution copy of the SAME strip, same length and order.
+   *  The full journey is 30MB and takes ~45s to decode; the proxy is 7MB and
+   *  lands in a few seconds, so scrubbing is smooth almost immediately and the
+   *  full frames swap in underneath as they arrive. The source is already
+   *  upscaled 1.67-2x on a retina canvas, so compressing the REAL frames to
+   *  solve load time would have cost visible sharpness in the hero image —
+   *  this buys the same speed and gives the quality back. */
+  proxyUrls?: string[];
+  /** Frame indices to fetch at full resolution before anything else — the
+   *  frames the journey actually stops on, so a catch is never soft. */
+  priority?: number[];
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imagesRef = useRef<(HTMLImageElement | null)[]>([]);
+  const proxyRef = useRef<(HTMLImageElement | null)[]>([]);
   /** last frame actually PAINTED. A ref, not an effect local: the draw effect
    *  re-runs on prop changes, and an effect-local would reset to null and let
    *  the very next canvas wipe paint flat background instead of real footage. */
   const lastImgRef = useRef<HTMLImageElement | null>(null);
 
-  // Batched frame loading (8 frames / 50ms), frame 0 first — audit-faithful.
+  // ── THREE-PASS LOADING ────────────────────────────────────────────────
+  //  1. the whole proxy strip, fast, so there is always something real to draw
+  //  2. the priority (catch) frames at full res, so a hold is never soft
+  //  3. everything else in order, streaming in underneath
   useEffect(() => {
     if (!frameUrls?.length) return;
     imagesRef.current = new Array(frameUrls.length).fill(null);
+    proxyRef.current = new Array(frameUrls.length).fill(null);
     let cancelled = false;
+
     const done = new Array(frameUrls.length).fill(false);
-    let edge = 0;                       // highest contiguous decoded index + 1
+    let edge = 0;
     const tick = (i: number) => {
       done[i] = true;
       while (done[edge]) edge++;
       if (readyRef) readyRef.current = edge;
     };
-    const load = (i: number) => {
+
+    const into = (
+      arr: (HTMLImageElement | null)[], url: string, i: number,
+      after?: (i: number) => void,
+    ) => {
       const img = new Image();
-      img.src = frameUrls[i];
-      const ok = () => tick(i);
+      img.src = url;
+      const ok = () => after?.(i);
       if (img.decode) img.decode().then(ok, () => { img.onload = ok; img.onerror = ok; });
       else { img.onload = ok; img.onerror = ok; }
-      imagesRef.current[i] = img;
+      arr[i] = img;
     };
-    load(0);
-    const rest = frameUrls.map((_, i) => i).slice(1);
-    const pump = () => {
+
+    if (proxyUrls?.length === frameUrls.length) {
+      const q = proxyUrls.map((_, i) => i);
+      const pumpProxy = () => {
+        if (cancelled || !q.length) return;
+        q.splice(0, 12).forEach((i) => into(proxyRef.current, proxyUrls[i], i));
+        setTimeout(pumpProxy, 30);
+      };
+      pumpProxy();
+    }
+
+    const pri = priority ?? [];
+    pri.forEach((i) => into(imagesRef.current, frameUrls[i], i, tick));
+
+    const rest = frameUrls.map((_, i) => i).filter((i) => !pri.includes(i));
+    const pumpFull = () => {
       if (cancelled || !rest.length) return;
-      rest.splice(0, 8).forEach(load);
-      setTimeout(pump, 50);
+      rest.splice(0, 6).forEach((i) => into(imagesRef.current, frameUrls[i], i, tick));
+      setTimeout(pumpFull, 60);
     };
-    pump();
-    return () => {
-      cancelled = true;
-    };
-  }, [frameUrls]);
+    pumpFull();
+
+    return () => { cancelled = true; };
+  }, [frameUrls, proxyUrls, priority, readyRef]);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     let raf = 0;
     let lastFrame = -1;
+    let lastProxy = -1;
     const total = frameUrls?.length ?? frameCount;
 
     const drawImage = (img: HTMLImageElement) => {
@@ -194,11 +230,17 @@ export default function FrameScrubber({
         if (img && img.complete && img.naturalWidth) {
           drawImage(img);
           lastFrame = f;
+          lastProxy = -1;
           signalReady(); // first real frame is on screen — safe to lift the loader
         } else if (!frameUrls?.length) {
           drawPlaceholder(f, p);
           lastFrame = f;
           signalReady();
+        } else if (proxyRef.current[f]?.complete && proxyRef.current[f]!.naturalWidth) {
+          // full res is still in flight — draw the proxy so the motion stays
+          // smooth, and keep lastFrame unset so the loop swaps the real frame
+          // in the moment it decodes.
+          if (f !== lastProxy) { drawImage(proxyRef.current[f]!); lastProxy = f; signalReady(); }
         } else if (lastImgRef.current?.complete) {
           // frame f is still downloading. Repaint the last good frame rather
           // than leaving whatever the canvas happens to hold — after a resize

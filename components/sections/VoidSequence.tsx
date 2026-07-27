@@ -40,6 +40,12 @@ const frameUrls = Array.from(
   { length: FRAMES },
   (_, i) => `/frames/void/f_${String(i + 1).padStart(3, "0")}.webp`,
 );
+/** 640px copies — 5.6MB against the full strip's 34MB. The void is the longest
+ *  strip on the site, so it benefits from the proxy tier more than anything. */
+const proxyUrls = Array.from(
+  { length: FRAMES },
+  (_, i) => `/frames/void-proxy/f_${String(i + 1).padStart(3, "0")}.webp`,
+);
 
 /** the mapping transition occupies the first 134 of 585 frames */
 const MAPPING_END = 134 / FRAMES; // ≈ 0.229
@@ -238,6 +244,7 @@ export default function VoidSequence() {
             frameUrls={frameUrls}
             fit="cover"
             background="#f4f6f8"
+            proxyUrls={proxyUrls}
           />
         </div>
 

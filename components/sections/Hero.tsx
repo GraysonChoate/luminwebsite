@@ -27,6 +27,11 @@ const LAST = FRAME_COUNT - 1; // 477 (end of the final "fuel" beat)
 
 const frameUrls = (variant: "desktop" | "mobile") =>
   Array.from({ length: FRAME_COUNT }, (_, i) => `/frames/journey/${variant}/f_${String(i + 1).padStart(3, "0")}.webp`);
+/** 640px copies of the same strip — 7MB against the full strip's 30MB */
+const proxyUrls = Array.from(
+  { length: FRAME_COUNT },
+  (_, i) => `/frames/journey/desktop-proxy/f_${String(i + 1).padStart(3, "0")}.webp`,
+);
 
 /* ── BEAT GATING ──────────────────────────────────────────────────────────
    The journey used to be a pure scrub, so how many scenes you crossed was
@@ -91,6 +96,10 @@ function coverPoint(vw: number, vh: number, sx: number, sy: number) {
 
 /** the eight catch points, in section-progress space */
 const ANCHORS = SCENE_LINKS.map((s) => s.frame / LAST);
+/** fetch the caught frames at full resolution first — a hold is never soft.
+ *  A couple either side too, so easing into the catch is crisp as well. */
+const PRIORITY = SCENE_LINKS.flatMap((s) => [s.frame - 2, s.frame - 1, s.frame, s.frame + 1])
+  .filter((f) => f >= 0 && f <= LAST);
 
 /** caption windows in progress space, proportional to beat frame ranges */
 const WINDOWS = JOURNEY.beats.map((b) => {
@@ -303,6 +312,8 @@ export default function Hero() {
             frameUrls={frameUrls(variant)}
             fit="cover"
             readyRef={framesReady}
+            proxyUrls={variant === "desktop" ? proxyUrls : undefined}
+            priority={PRIORITY}
           />
         </div>
 

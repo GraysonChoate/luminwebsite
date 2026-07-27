@@ -272,6 +272,19 @@ export function createScrubCatch({
   const done = new Set<number>();      // anchors already released
   let last = 0;
 
+  /* ── ONE FLICK IS NOT ONE GESTURE ──────────────────────────────────────
+     A trackpad flick emits dozens of wheel events over ~600ms. Releasing on
+     the first one meant the remaining tail of the SAME flick blew straight
+     through every anchor after it — the whole journey firing off in one
+     swipe. A release now needs two things: the catch must have been held
+     briefly, and the wheel stream must have gone quiet first, which is what
+     actually distinguishes a new deliberate gesture from the tail of the old
+     one. Flick events are ~10-30ms apart; a real second gesture is not. */
+  let caughtAt = 0;
+  let lastWheelAt = 0;
+  const MIN_HOLD_MS = 420;    // the catch is always readable
+  const QUIET_MS = 160;       // the previous flick must have ended
+
   const span = () => Math.max(1, section.offsetHeight - window.innerHeight);
   const yFor = (p: number) => Math.round(section.offsetTop + span() * p);
 
@@ -291,6 +304,7 @@ export function createScrubCatch({
     window.addEventListener("wheel", block, { passive: false });
     window.addEventListener("touchmove", block, { passive: false });
     window.addEventListener("scroll", hold);
+    caughtAt = performance.now();
     onCatch(i);
   }
 
@@ -301,11 +315,18 @@ export function createScrubCatch({
     window.removeEventListener("wheel", block);
     window.removeEventListener("touchmove", block);
     window.removeEventListener("scroll", hold);
-    getLenis()?.start();
+    const lenis = getLenis();
+    // Resync BEFORE starting. Lenis keeps the target it was heading for when it
+    // was stopped, so a hard flick into a catch leaves a target far down the
+    // page; start() alone would resume straight to it and rip through the rest
+    // of the film. Pin the target to where we actually are, then start.
+    lenis?.scrollTo(pinnedTo, { immediate: true, force: true });
+    lenis?.start();
     onRelease();
     // step just past the anchor so the crossing test cannot re-fire
+    last = (pinnedTo - section.offsetTop) / span();
     const nudge = pinnedTo + Math.round(window.innerHeight * 0.12);
-    getLenis()?.scrollTo(nudge, { duration: 0.5 });
+    lenis?.scrollTo(nudge, { duration: 0.5 });
   }
 
   const watcher = ScrollTrigger.create({
@@ -328,13 +349,26 @@ export function createScrubCatch({
 
   const onKey = (e: KeyboardEvent) => {
     if (held < 0) return;
-    if (KEYS.has(e.key)) { e.preventDefault(); letGo(); }
+    if (!KEYS.has(e.key)) return;
+    e.preventDefault();
+    if (performance.now() - caughtAt < MIN_HOLD_MS) return;
+    letGo();
   };
-  const onWheel = () => { if (held >= 0) letGo(); };
+  /** every wheel event marks the stream, blocked or not */
+  const onWheel = () => {
+    const now = performance.now();
+    const quiet = now - lastWheelAt;
+    lastWheelAt = now;
+    if (held < 0) return;
+    if (now - caughtAt < MIN_HOLD_MS) return;   // still landing
+    if (quiet < QUIET_MS) return;               // tail of the same flick
+    letGo();
+  };
   let ty = 0;
   const onTouchStart = (e: TouchEvent) => { ty = e.touches[0].clientY; };
   const onTouchEnd = (e: TouchEvent) => {
     if (held < 0) return;
+    if (performance.now() - caughtAt < MIN_HOLD_MS) return;
     if (Math.abs(ty - (e.changedTouches[0]?.clientY ?? ty)) > 24) letGo();
   };
   const navRelease = () => letGo();

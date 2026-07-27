@@ -42,24 +42,25 @@ import FrameScrubber from "@/components/ui/FrameScrubber";
  * the bottom-right portion").
  */
 
-const PU_FRAMES = 193;
+const PU_FRAMES = 241;
 const puUrls = Array.from(
   { length: PU_FRAMES },
   (_, i) => `/frames/powerup/f_${String(i + 1).padStart(3, "0")}.webp`,
 );
 
 /* ── WHICH POWER-UP CLIP IS BAKED IN ──────────────────────────────────────
-   The white one: APPROVED-powerup-WHITE-8s.mp4, 193 frames at 24fps. It
-   replaced the multi-colour 10s take, and it also fixed a registration error —
-   2D-aligning the panel region put the 10s clip 6px BELOW the idle loop, so the
-   panel used to jump the moment you typed. This clip sits within 1px of the
-   idle loop, which is why every source y below is the old measurement minus 5.
+   The MULTI-COLOUR one: APPROVED-powerup-10s.mp4, 241 frames at 24fps. The
+   white 8s take was tried and reverted.
 
-   The other consequence of the swap: this clip lights all SIX baked rows, where
-   the 10s clip lit five and left the sixth dark. That is fine here in a way it
-   would not have been there — these rows only BRIGHTEN, they are not colour-
-   coded per answer, so a lit sixth box reads as the panel energising rather
-   than as a field somebody filled in.
+   It carries one known flaw. 2D-aligning the panel region puts this clip about
+   6px BELOW the idle loop it plays over, so the panel shifts very slightly the
+   moment you start typing. The white take did not have that. It is a property
+   of the render, not of the code — fixing it properly means regenerating the
+   clip, so the row coordinates below are aligned to THIS clip and the shift is
+   accepted for now.
+
+   It lights five of the six baked rows; the sixth stays dark, which is why the
+   form is five fields.
 
    ── PANEL GEOMETRY, measured off the render ──────────────────────────────
    The glass panel and its rows are BAKED into the idle and power-up clips at
@@ -82,25 +83,22 @@ const SRC_W = 1920, SRC_H = 1080;
  *  button. The render also bakes a sixth box at {x:334, w:507, cy:803, h:68};
  *  it is deliberately unused and never lights, so leave it alone. */
 const ROWS = [
-  { x: 360, w: 449, cy: 295, h: 59 },
-  { x: 360, w: 449, cy: 393, h: 59 },
-  { x: 360, w: 449, cy: 490, h: 59 },
-  { x: 334, w: 507, cy: 621, h: 68 },
-  { x: 334, w: 507, cy: 709, h: 67 },
+  { x: 360, w: 449, cy: 300, h: 59 },
+  { x: 360, w: 449, cy: 398, h: 59 },
+  { x: 360, w: 449, cy: 495, h: 59 },
+  { x: 334, w: 507, cy: 626, h: 68 },
+  { x: 334, w: 507, cy: 714, h: 67 },
 ];
-const BTN = { x: 330, w: 511, cy: 884, h: 71 };
+const BTN = { x: 330, w: 511, cy: 889, h: 71 };
 
-/** Where the scrub PARKS after each field is filled — not `filled / 5`.
- *  The clip does not light rows on an even cadence: measured onsets are 0.125,
- *  0.250, 0.375, 0.625, 0.771, 0.896, with a deliberate pause crossing from the
- *  inner card to the outer panel. An even fifth (0.2/0.4/0.6/0.8/1.0) overshot
- *  onset 5 at four fields filled and lit two rows at once — the exact "it
- *  activates early" defect the colour version showed. Each stop below parks
- *  past its own row's onset and short of the next one.
- *  The last stop runs all the way to 1.0 because the button does not charge
- *  until 0.938; that makes the final surge the biggest of the five, which is
- *  also the "more powerful as it gets closer to submit" note. */
-const STOPS = [0, 0.194, 0.319, 0.512, 0.705, 1.0];
+/** Where the scrub PARKS after each answer — not `filled / 5`.
+ *  This clip lights rows at 0.050, 0.237, 0.438, 0.637 and 0.787, which is not
+ *  an even fifth. Parking on even fifths put stop 4 at 0.80, past onset 5 at
+ *  0.787, so the fourth answer lit two rows at once — the "the orange one
+ *  activates early" defect. Each stop parks past its own row's onset and short
+ *  of the next; the last runs to 1.0 to charge the button, which also makes the
+ *  final surge the biggest of the five. */
+const STOPS = [0, 0.14, 0.34, 0.54, 0.71, 1.0];
 
 /** map a source-space rect to screen, matching object-fit: cover */
 function coverRect(vw: number, vh: number, sx: number, sy: number, sw: number, sh: number) {
@@ -322,7 +320,7 @@ export default function LaunchpadCTA() {
               <div key={f.id} className="absolute" style={{ left: r.left, top: r.top, width: r.width, height: r.height }}>
                 <span
                   className="type-eyebrow absolute -translate-y-full text-[9px]"
-                  style={{ top: -4, left: 2, color: done ? "rgba(33,33,33,0.78)" : "rgba(33,33,33,0.48)" }}
+                  style={{ top: -4, left: 2, color: done ? "rgba(255,255,255,0.85)" : "rgba(33,33,33,0.48)" }}
                 >
                   {f.label}
                   {hasText && !done && f.type !== "choice" && (
@@ -339,7 +337,7 @@ export default function LaunchpadCTA() {
                       type="button"
                       onClick={() => setOpenPicker((o) => (o === f.id ? null : f.id))}
                       className="flex h-full w-full items-center justify-between bg-transparent px-4 text-left outline-none"
-                      style={{ color: "var(--c-cosmos)", fontSize: ink }}
+                      style={{ color: done ? "#fff" : "var(--c-cosmos)", fontSize: ink }}
                     >
                       <span className="truncate">
                         {done ? picked.join(", ") : ""}
@@ -444,16 +442,13 @@ export default function LaunchpadCTA() {
                   }}
                   className="h-full w-full bg-transparent px-4 outline-none"
                   style={{
-                    // Cosmos on every row, filled or not. The old rule flipped to
-                    // white once a field was done, which was right for the
-                    // multi-colour clip (white on a saturated blue/teal/purple
-                    // fill). This clip only brightens the rows toward white, so
-                    // white ink measured ~1.05:1 against a 248-luminance row —
-                    // the answer you just typed was the least readable thing on
-                    // screen. Ink stays dark; the ROW carries the state.
-                    color: "var(--c-cosmos)",
+                    // White once the row is lit — these fills are saturated
+                    // blue/teal/purple/orange, and Cosmos disappears on them.
+                    // (With the white clip this had to be the other way round:
+                    // white ink measured ~1.05:1 on a 248-luminance row.)
+                    color: done ? "#fff" : "var(--c-cosmos)",
                     fontSize: ink,
-                    caretColor: "var(--c-supernova)",
+                    caretColor: done ? "#fff" : "var(--c-supernova)",
                   }}
                   autoComplete="off"
                 />

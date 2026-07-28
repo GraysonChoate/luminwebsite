@@ -335,22 +335,25 @@ export default function Hero() {
     //    animates SCROLL rather than frames, so every rule built above keeps
     //    driving itself off its own ScrollTrigger with nothing to keep in sync.
     let caught = false;
+    let governor: ReturnType<typeof createScrollGovernor> | null = null;
     const gate = createScrubCatch({
       section,
       anchors: ANCHORS,
       onCatch: () => { caught = true; },
       onRelease: () => { caught = false; },
+      // a beat holds until YOU ask for more, not until a clock runs out
+      wantsMore: () => governor?.pending() ?? 1,
     });
     // An even tempo between the products, whatever the hand does. The catches
     // decide WHERE it stops; this decides how fast it travels in between —
     // previously that was entirely down to how hard you flicked, and the arrow
     // keys jumped a whole scene at a time.
-    const governor = createScrollGovernor({
-      section, maxPxPerSec: 430, keyStep: 400, paused: () => caught,
+    governor = createScrollGovernor({
+      section, maxPxPerSec: 340, keyStep: 340, paused: () => caught,
     });
 
     return () => {
-      governor.destroy();
+      governor?.destroy();
       gate.destroy();
       if (onMove) section.removeEventListener("pointermove", onMove);
       ctx.revert();

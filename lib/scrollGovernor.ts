@@ -20,7 +20,12 @@ import { getLenis } from "@/components/SmoothScroll";
  * working off its own ScrollTrigger with nothing to keep in sync.
  */
 
-export type Governor = { destroy: () => void };
+export type Governor = {
+  /** how much travel is still queued, in px. 0 means the visitor has stopped
+   *  asking to move — a held beat uses this to decide whether to carry on. */
+  pending: () => number;
+  destroy: () => void;
+};
 
 const KEYS: Record<string, number> = {
   ArrowDown: 1, PageDown: 1, " ": 1, Spacebar: 1,
@@ -45,6 +50,12 @@ export function createScrollGovernor({
 
   /** never let one gesture bank more than this — a flick should not buy a mile */
   const MAX_PENDING = 1400;
+  /** …and while a beat is HELD, bank almost nothing. A flick into a catch used
+   *  to keep its whole queued distance, so the moment the beat let go the page
+   *  carried on by itself — measured 744px of travel with the visitor's hands
+   *  off the trackpad, which is exactly the sporadic feel reported. Enough is
+   *  kept to register "yes, carry on", and no more. */
+  const PAUSED_CAP = 140;
 
   const block = (e: Event) => e.preventDefault();
 
@@ -75,7 +86,11 @@ export function createScrollGovernor({
     raf = requestAnimationFrame(tick);
     const dt = Math.min(0.05, (now - lastT) / 1000 || 0.016);
     lastT = now;
-    if (!engaged || (paused?.() ?? false)) return;
+    if (!engaged) return;
+    if (paused?.() ?? false) {
+      pending = Math.sign(pending) * Math.min(Math.abs(pending), PAUSED_CAP);
+      return;
+    }
     if (Math.abs(pending) < 0.5) { pending = 0; return; }
 
     const step = Math.sign(pending) * Math.min(Math.abs(pending), maxPxPerSec * dt);
@@ -132,6 +147,7 @@ export function createScrollGovernor({
   raf = requestAnimationFrame(tick);
 
   return {
+    pending: () => Math.abs(pending),
     destroy() {
       cancelAnimationFrame(raf);
       disengage();

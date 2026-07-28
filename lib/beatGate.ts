@@ -47,13 +47,18 @@ const KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End
 export type ScrubCatch = { destroy: () => void };
 
 export function createScrubCatch({
-  section, anchors, onCatch, onRelease, softMs = 0, holdMs = 1600,
+  section, anchors, onCatch, onRelease, wantsMore, softMs = 0, holdMs = 1600,
 }: {
   section: HTMLElement;
   /** anchor positions in section-progress space (0..1), ascending */
   anchors: number[];
   onCatch: (i: number) => void;
   onRelease: () => void;
+  /** Fresh scroll intent — how much travel the visitor has asked for. When
+   *  supplied, a beat holds until the minimum time has passed AND this goes
+   *  positive, so nothing moves unless the visitor moves it. Without it the
+   *  beat simply times out. */
+  wantsMore?: () => number;
   /** Ease to the anchor over this long instead of jumping to it. 0 is a hard
    *  snap, which is right in the journey where the frame is already the scene.
    *  The white void wants the gentler version — the copy is still travelling
@@ -124,7 +129,21 @@ export function createScrubCatch({
       window.addEventListener("scroll", hold);
     }
     window.clearTimeout(holdTimer);
-    holdTimer = window.setTimeout(letGo, softMs + holdMs);
+    if (wantsMore) {
+      // MINIMUM hold, then wait to be asked. Releasing on a bare timer meant
+      // the film carried on by itself and shoved the page forward whether the
+      // visitor was scrolling or not — which reads as sporadic. Now a beat sits
+      // there indefinitely until fresh scroll intent arrives.
+      const readyAt = performance.now() + softMs + holdMs;
+      const poll = () => {
+        if (held !== i) return;
+        if (performance.now() >= readyAt && wantsMore() > 0) { letGo(); return; }
+        holdTimer = window.setTimeout(poll, 80);
+      };
+      holdTimer = window.setTimeout(poll, softMs + holdMs);
+    } else {
+      holdTimer = window.setTimeout(letGo, softMs + holdMs);
+    }
     onCatch(i);
   }
 
@@ -145,10 +164,11 @@ export function createScrubCatch({
     lenis?.scrollTo(pinnedTo, { immediate: true, force: true });
     lenis?.start();
     onRelease();
-    // step just past the anchor so the crossing test cannot re-fire
-    last = (pinnedTo - section.offsetTop) / span();
-    const nudge = pinnedTo + Math.round(window.innerHeight * 0.12);
-    lenis?.scrollTo(nudge, { duration: 0.5 });
+    // Step the crossing marker just past this anchor so it cannot re-fire.
+    // There used to be a 108px auto-scroll here as well — that was the page
+    // shoving itself along on release, and it is gone. Movement now comes only
+    // from the visitor.
+    last = (pinnedTo - section.offsetTop) / span() + 0.001;
   }
 
   const watcher = ScrollTrigger.create({

@@ -336,8 +336,11 @@ export default function EcosystemSequence() {
       const y = Math.round(section.offsetTop + pinned * GATE_AT);
       const lenis = getLenis();
       lenis ? lenis.scrollTo(y, { duration: 1.4 }) : window.scrollTo({ top: y, behavior: "smooth" });
-      // let it take the screen again once they head forward
-      window.setTimeout(() => { exitingRef.current = false; }, 1600);
+      // …and it does NOT take the screen back. Re-arming meant the next flick
+      // re-seized and yanked straight to the hub — the section vanished, jumped
+      // and dumped you back where you had just left. Scroll stays yours from
+      // here, both ways; the hub's controls simply reappear if you scroll far
+      // enough forward to be standing in front of it again.
     }
     navRef.current = { goForward, goBack, activate };
 
@@ -471,10 +474,9 @@ export default function EcosystemSequence() {
           paintIdle(p);
           // The cue belongs to the dwell only — not while they're scrubbing
           // back through the activation, and not once they've acted on it.
-          // The controls belong to the settled hub. They must NOT be gated on
-          // lockedRef any more — the lock is now permanent once we arrive, so
-          // that test would hide the buttons forever.
-          if (!settledRef.current) setCue(false);
+          // The controls belong to the lit hub, and follow scroll position so
+          // they come back on their own after GO BACK — no re-seizing needed.
+          setCue(activatedRef.current && p >= BAND_END - IDLE_FADE);
         },
       });
 

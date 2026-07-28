@@ -404,9 +404,19 @@ export default function LaunchpadCTA() {
 
                     {openPicker === f.id && (
                       <div
-                        className="absolute left-0 z-30 overflow-hidden rounded-[12px]"
+                        className="absolute left-0 z-30 overflow-y-auto rounded-[12px]"
                         style={{
-                          top: r.height + 8, width: r.width,
+                          /* OPEN UPWARDS when there is not enough room below.
+                             The last row sits near the bottom of the panel, so
+                             its list ran off the page and covered LAUNCH — you
+                             could see the button and not press it. Capped in
+                             height too, so a long list scrolls inside itself
+                             rather than growing past the viewport. */
+                          ...(r.top + r.height + 8 + (f.options!.length + (f.multi ? 1 : 0)) * 48 > vp.h - 24
+                            ? { bottom: r.height + 8 }
+                            : { top: r.height + 8 }),
+                          maxHeight: Math.max(180, vp.h * 0.5),
+                          width: r.width,
                           background: "rgba(255,255,255,0.90)",
                           backdropFilter: "blur(22px)", WebkitBackdropFilter: "blur(22px)",
                           border: "1px solid rgba(33,33,33,0.10)",

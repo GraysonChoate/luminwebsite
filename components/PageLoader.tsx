@@ -12,6 +12,14 @@ import { gsap } from "@/lib/motion";
  */
 const MIN_SHOW = 0.8; // seconds — floor before a wheel/touch may skip the emerge
 const MAX_WAIT = 13; // seconds — hard cap even if the clip never fires `ended`
+/** Lift two seconds before the clip ends.
+ *  The emerge runs 10.03s but it never actually settles — the orb keeps
+ *  breathing right to the last frame, so handing over to the hero's idle loop
+ *  is a soft cut wherever you make it. Measured against the idle loop's first
+ *  frame: at 8.0s the difference is 6.51/255, at 9.9s it is 6.18 — the same.
+ *  So the last two seconds cost time and buy nothing. The clip's own speed is
+ *  untouched; it simply hands over sooner. */
+const LIFT_AT = 8.0;
 
 export default function PageLoader() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -45,6 +53,7 @@ export default function PageLoader() {
     const onEnded = () => release();
     v?.addEventListener("ended", onEnded);
 
+    const liftTimer = setTimeout(release, LIFT_AT * 1000);
     const maxTimer = setTimeout(release, MAX_WAIT * 1000);
     const onIntent = () => {
       if ((performance.now() - start) / 1000 >= MIN_SHOW) release();
@@ -56,6 +65,7 @@ export default function PageLoader() {
       v?.removeEventListener("ended", onEnded);
       window.removeEventListener("wheel", onIntent);
       window.removeEventListener("touchstart", onIntent);
+      clearTimeout(liftTimer);
       clearTimeout(maxTimer);
     };
   }, []);

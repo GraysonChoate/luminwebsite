@@ -51,8 +51,19 @@ const KEYS_BACK = new Set(["ArrowUp", "PageUp"]);
 
 /** input has to stop this long before a new gesture counts */
 const QUIET_MS = 150;
-/** …unless this much has been pushed without a pause, for people who never stop */
-const ARM_BUDGET = 1400;
+/**
+ * …unless input has been arriving without a break for this long, which is the
+ * escape hatch for a visitor who simply never lifts their fingers.
+ *
+ * This was a DISTANCE budget first, and distance is the wrong measure: how much
+ * of a momentum tail survives the travel depends on how long the travel takes,
+ * so the same flick armed on the production build (fast) and did not on dev
+ * (slow) — one scene locally, two in the build. Time does not have that
+ * problem. A macOS momentum tail is finite and dies inside about 2.5s from the
+ * flick, and the travel has already eaten part of it before we start counting,
+ * so a tail can never sustain this. A hand still moving passes it every time.
+ */
+const SUSTAIN_MS = 2600;
 /** once armed, this much push is a gesture */
 const MIN_PUSH = 25;
 
@@ -77,6 +88,7 @@ export function createSceneStepper({
   let travelling = false;
   let armed = false;
   let pushed = 0;              // signed, since the last arrival
+  let sustainFrom = 0;         // when the current unbroken run of input began
   let at = -1;                 // resting anchor index; -1 = the opening
   let tween: gsap.core.Tween | null = null;
   let quietT: number | undefined;
@@ -98,18 +110,21 @@ export function createSceneStepper({
   function disarm() {
     armed = false;
     pushed = 0;
+    sustainFrom = 0;
     window.clearTimeout(quietT);
-    quietT = window.setTimeout(() => { armed = true; pushed = 0; }, QUIET_MS);
+    quietT = window.setTimeout(() => { armed = true; pushed = 0; sustainFrom = 0; }, QUIET_MS);
   }
 
   function record(dy: number) {
     // THE FIX. Input during travel is discarded, not queued. Queuing it is what
     // let a flick buy several scenes and made the film run on by itself.
     if (travelling || !engaged) return;
+    const now = performance.now();
+    if (!sustainFrom) sustainFrom = now;
     pushed += dy;
-    if (!armed && Math.abs(pushed) >= ARM_BUDGET) armed = true;
+    if (!armed && now - sustainFrom >= SUSTAIN_MS) armed = true;
     window.clearTimeout(quietT);
-    quietT = window.setTimeout(() => { armed = true; pushed = 0; }, QUIET_MS);
+    quietT = window.setTimeout(() => { armed = true; pushed = 0; sustainFrom = 0; }, QUIET_MS);
     if (armed && Math.abs(pushed) >= MIN_PUSH) step(Math.sign(pushed));
   }
 

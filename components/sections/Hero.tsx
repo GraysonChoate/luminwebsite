@@ -211,17 +211,16 @@ export default function Hero() {
     let onMove: ((e: PointerEvent) => void) | null = null;
     const ctx = gsap.context(() => {
       // 1. frame scrub across the pinned walk (piecewise-shaped).
-      // 0.18, not 0.6. The long ease existed to smooth raw wheel jolts, but
-      // scroll is no longer raw — the stepper drives it with an eased tween, so
-      // the smoothing is already done upstream and all a big scrub adds is lag.
-      // At 0.6 the picture was still drifting for half a second after the
-      // scroll had stopped, which is the opposite of the hard stop the product
-      // moments need.
+      // 0.35. This IS the ease now: the stepper drives scroll dead linear so
+      // the film holds 24fps through the middle of a leg, and this scrub is
+      // what softens both ends — the picture leans into the move and settles
+      // into the stop instead of halting on a dime. The original 0.6 lagged
+      // half a second behind and read as drift; 0.18 was accurate but abrupt.
       ScrollTrigger.create({
         trigger: section,
         start: "top top",
         end: "bottom bottom",
-        scrub: 0.18,
+        scrub: 0.35,
         onUpdate: (self) => {
           progressRef.current = self.progress;
           frameRef.current = self.progress * LAST;
@@ -338,6 +337,9 @@ export default function Hero() {
     const stepper = createSceneStepper({
       section,
       anchors: ANCHORS,
+      // paced in FILM frames, so the journey plays at the 24fps it was shot at
+      // and the window height cannot change how fast it runs
+      totalFrames: LAST,
       // The callout is bound to ARRIVAL, not to the frame being nearby. Driving
       // it off frame proximity is what made it slide into shot ahead of the
       // stop; now it appears at the freeze and nowhere else.

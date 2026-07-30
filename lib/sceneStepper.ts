@@ -49,8 +49,25 @@ export type SceneStepper = { destroy: () => void };
 const KEYS_FWD = new Set(["ArrowDown", "PageDown", " ", "Spacebar"]);
 const KEYS_BACK = new Set(["ArrowUp", "PageUp"]);
 
-/** input has to stop this long before a new gesture counts */
-const QUIET_MS = 150;
+/**
+ * Input has to stop this long before a new gesture counts.
+ *
+ * 320, and it has to be over 250. A macOS momentum tail does not just decay in
+ * SIZE, it decays in FREQUENCY — the gaps between its events widen toward a
+ * quarter of a second as it dies. At 150 the end of a tail looked like silence
+ * followed by fresh input, so it armed itself and stepped a second scene. That
+ * is the same trap recorded in beatGate.ts ("release after 160ms of quiet → a
+ * decaying tail's gaps widen past that").
+ *
+ * It surfaced only after the journey was slowed to 24fps: with faster travel
+ * the whole tail was still dense when it arrived, and it was the SLOW build
+ * that exposed the widest-gap end of it. Both halves of that pair — a fast
+ * build and a slow one — were needed to see it.
+ *
+ * A long quiet threshold on its own would freeze anyone who never pauses;
+ * SUSTAIN_MS below is what makes it safe.
+ */
+const QUIET_MS = 320;
 /**
  * …unless input has been arriving without a break for this long, which is the
  * escape hatch for a visitor who simply never lifts their fingers.
@@ -68,19 +85,34 @@ const SUSTAIN_MS = 2600;
 const MIN_PUSH = 25;
 
 export function createSceneStepper({
-  section, anchors, onDepart, onArrive, onExit, pxPerSec = 380, settleMs = 200,
+  section, anchors, totalFrames, onDepart, onArrive, onExit,
+  framesPerSec = 24, settleMs = 420,
 }: {
   section: HTMLElement;
   /** the resting points, in section-progress space (0..1), ascending */
   anchors: number[];
+  /** how many frames the section's progress spans, so travel can be timed in
+   *  FILM time rather than screen distance */
+  totalFrames: number;
   /** the film has started moving — hide anything pinned to the frame */
   onDepart: () => void;
   /** resting on anchor `i`, frame settled. Show the callout HERE and only here. */
   onArrive: (i: number) => void;
   /** stepped past the last anchor: control is handed back to the page */
   onExit: () => void;
-  /** travel speed. Constant, so every scene runs at the same tempo. */
-  pxPerSec?: number;
+  /**
+   * THE FILM'S OWN RATE. Everything in this project is 24fps footage, so at 24
+   * the walk, the camera move and the holograms all play at the timing they
+   * were rendered for.
+   *
+   * This was px-per-second first, and that is wrong twice over. It ran the
+   * journey at about 50 frames a second — a shade over DOUBLE the authored
+   * speed, with everyone in the gym moving at double time. And because the
+   * scroll distance a section spans depends on the window height, the same
+   * setting played the film faster on a shorter window: 380 px/s is ~50fps at
+   * 900px tall and ~64fps at 700px. Frames per second has neither problem.
+   */
+  framesPerSec?: number;
   /** how long to let the scrubbed frame catch up before calling it a stop */
   settleMs?: number;
 }): SceneStepper {
@@ -141,16 +173,22 @@ export function createSceneStepper({
 
     const fromY = window.scrollY;
     const toY = next > last ? endY() : next < 0 ? section.offsetTop : yFor(anchors[next]);
-    // CONSTANT SPEED. Duration comes from the distance, so a long gap between
-    // two products takes longer than a short one and the film always advances
-    // at the same rate — which is what "even tempo" means. A fixed duration
-    // would do the opposite and make the wide gaps race.
-    const duration = Math.max(0.4, Math.abs(toY - fromY) / pxPerSec);
+    // CONSTANT RATE, measured in film. A wide gap between two products takes
+    // proportionally longer than a narrow one, which is what "even tempo"
+    // means — a fixed duration per step would do the opposite and make the
+    // wide gaps race.
+    const frames = Math.abs(toY - fromY) / Math.max(1, span()) * totalFrames;
+    const duration = Math.max(0.4, frames / framesPerSec);
 
     const o = { y: fromY };
     tween?.kill();
     tween = gsap.to(o, {
-      y: toY, duration, ease: "power1.inOut",
+      y: toY, duration,
+      // Linear on purpose. The ease-in/out is supplied by the frame scrub
+      // downstream, which softens both ends on its own — doing it here as well
+      // would peak the middle of every leg well above 24fps and undo the point
+      // of pacing to the film's own rate.
+      ease: "none",
       onUpdate: () => {
         getLenis()?.stop();                      // we are the only thing moving the page
         window.scrollTo(0, Math.round(o.y));

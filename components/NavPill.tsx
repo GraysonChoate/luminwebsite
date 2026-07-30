@@ -57,6 +57,26 @@ export default function NavPill() {
 
   const ink = onLight ? "var(--c-cosmos)" : "#fff";
 
+  /** The trace palette, per tone. Over the white void a glow has nothing to
+   *  bite on — spreading white light on white just greys the letters — so that
+   *  side carries the effect in Supernova ink and a solid rail instead, and
+   *  the bloom is dialled almost out. See globals.css § NAV TAB. */
+  const trace = onLight
+    ? {
+        "--nav-hot": "var(--c-supernova)",
+        "--nav-rail": "rgba(82,112,255,0.55)",
+        "--nav-spark": "rgba(82,112,255,0.85)",
+        "--nav-spark-hot": "#5270ff",
+        "--nav-glow": "rgba(82,112,255,0.30)",
+      }
+    : {
+        "--nav-hot": "#ffffff",
+        "--nav-rail": "rgba(140,168,255,0.42)",
+        "--nav-spark": "rgba(130,160,255,0.95)",
+        "--nav-spark-hot": "#ffffff",
+        "--nav-glow": "rgba(120,150,255,0.75)",
+      };
+
   /** Release every beat gate before navigating.
    *  This is what makes the nav bar a REAL exit. Gated sections suppress wheel
    *  and touch and actively pin scroll back to the held beat; without this the
@@ -148,16 +168,21 @@ export default function NavPill() {
             // gap-5, not gap-7: eight tabs at 28px apart overran the pill and
             // pushed the two buttons off the right edge on a 1200px window.
             className="font-nav hidden items-center gap-5 text-[13px] font-medium lg:flex"
-            style={{ color: onLight ? "rgba(33,33,33,0.82)" : "rgba(255,255,255,0.9)" }}
+            style={{
+              color: onLight ? "rgba(33,33,33,0.82)" : "rgba(255,255,255,0.9)",
+              ...(trace as React.CSSProperties),
+            }}
           >
             {NAV.items.map((item) => (
               <button
                 key={item.label}
                 onClick={() => go(item.anchor)}
-                className="transition-colors"
-                style={{ color: "inherit" }}
+                className="nav-tab"
               >
-                {item.label}
+                <span className="nav-tab-ink">{item.label}</span>
+                <span className="nav-tab-track" aria-hidden="true">
+                  <span className="nav-tab-spark" />
+                </span>
               </button>
             ))}
           </nav>
@@ -194,11 +219,26 @@ export default function NavPill() {
       {menuOpen && (
         <div
           className="fixed inset-0 z-[60] flex flex-col justify-center gap-6 px-10 lg:hidden"
-          style={{ background: "rgba(33,33,33,0.97)" }}
+          // the overlay is always dark, so it always takes the dark palette
+          style={{
+            background: "rgba(33,33,33,0.97)",
+            "--nav-hot": "#ffffff",
+            "--nav-rail": "rgba(140,168,255,0.42)",
+            "--nav-spark": "rgba(130,160,255,0.95)",
+            "--nav-spark-hot": "#ffffff",
+            "--nav-glow": "rgba(120,150,255,0.75)",
+          } as React.CSSProperties}
         >
           {NAV.items.map((item) => (
-            <button key={item.label} onClick={() => go(item.anchor)} className="type-step text-left text-white">
-              {item.label}
+            <button
+              key={item.label}
+              onClick={() => go(item.anchor)}
+              className="nav-tab type-step self-start text-left text-white"
+            >
+              <span className="nav-tab-ink">{item.label}</span>
+              <span className="nav-tab-track" aria-hidden="true">
+                <span className="nav-tab-spark" />
+              </span>
             </button>
           ))}
           <div className="mt-4 flex gap-3">

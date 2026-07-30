@@ -331,3 +331,102 @@ body {
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) { .cta-headline { animation: none; } }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NAV TAB — THE TRACE LIGHTS UP
+
+   Hovering a tab energises a circuit rather than decorating a word. The
+   Launchpad plate already routes glowing hairline traces from each form field
+   across to the gate, and the hub runs its light up a single beam; this is the
+   same vocabulary at nav scale, so the bar reads as wired into the machine the
+   rest of the page is made of instead of borrowing generic sci-fi shorthand.
+
+   Three things happen at once:
+     · the rail — a dim hairline draws out from the left under the word
+     · the spark — a bright head runs the rail once, left to right
+     · the bloom — the letters pick up light from underneath as it passes,
+                   peaking mid-sweep and settling to a steady glow
+
+   The spark moves on transform and fades on opacity — both composited, so the
+   sweep costs the main thread nothing. It matters here: this bar is on screen
+   for the entire film, over scrubbing canvases and playing video, and a nav
+   effect that repaints on every frame is exactly the kind of thing that put
+   29.8% of the main thread into a pixel readback last time.
+
+   Two tones, set from NavPill's own light/dark state: over the white void the
+   glow has nothing to bite on, so that side leans on Supernova in the ink and
+   the trace and drops the bloom almost entirely.
+   ══════════════════════════════════════════════════════════════════════════ */
+.nav-tab {
+  position: relative;
+  padding-bottom: 7px;
+  /* `inherit` belongs here, not on the element. As an inline style it outranked
+     the :hover rule below, so the rail and the spark lit but the word itself
+     never changed colour — invisible on the dark pill, where white-on-white
+     hid it, and obvious over the Launchpad where the tab should go Supernova. */
+  color: inherit;
+  transition: color .3s ease;
+}
+.nav-tab:hover { color: var(--nav-hot); }
+
+/* the rail */
+.nav-tab::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1px;
+  background: var(--nav-rail);
+  opacity: 0;
+  transform: scaleX(.35);
+  transform-origin: left center;
+  transition: opacity .3s ease, transform .42s cubic-bezier(.22,1,.36,1);
+  pointer-events: none;
+}
+.nav-tab:hover::after { opacity: 1; transform: scaleX(1); }
+
+/* the spark that runs it.
+   The track CLIPS it. Without that the spark carried on past the tab's right
+   edge and came to rest over the next tab along — a bright blob floating in
+   the gap between two words, which reads as a glitch rather than a circuit.
+   Clipped, it enters at one end and leaves at the other and never exists
+   outside its own rail. */
+.nav-tab-track {
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+}
+.nav-tab-spark {
+  position: absolute;
+  left: 0; top: 0;
+  width: 46%; height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg,
+              transparent 0%, var(--nav-spark) 58%, var(--nav-spark-hot) 76%, transparent 100%);
+  opacity: 0;
+  transform: translate3d(-110%, 0, 0);
+}
+.nav-tab:hover .nav-tab-spark { animation: navSpark .72s cubic-bezier(.34,0,.22,1) forwards; }
+
+@keyframes navSpark {
+  0%   { opacity: 0; transform: translate3d(-110%, 0, 0); }
+  12%  { opacity: 1; }
+  100% { opacity: 1; transform: translate3d(218%, 0, 0); }
+}
+
+/* the letters catch it as it goes under them */
+.nav-tab:hover .nav-tab-ink { animation: navBloom .72s ease-out forwards; }
+
+@keyframes navBloom {
+  0%   { text-shadow: none; }
+  46%  { text-shadow: 0 0 13px var(--nav-glow), 0 1px 5px var(--nav-glow); }
+  100% { text-shadow: 0 0 7px var(--nav-glow); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-tab:hover .nav-tab-spark,
+  .nav-tab:hover .nav-tab-ink { animation: none; }
+  .nav-tab::after { transition: opacity .2s ease; }
+  .nav-tab:hover::after { transform: scaleX(1); }
+}

@@ -17,6 +17,16 @@ export const NAV = {
     { label: "Products", anchor: "#products" },
     { label: "Why Lumin", anchor: "#why" },
     { label: "Company", anchor: "#about" },
+    // ── THE JUMPS ────────────────────────────────────────────────────────
+    // The film is gated end to end on purpose, which makes reviewing the back
+    // half a five-minute round trip every time. These three land you straight
+    // in a state: the hub already activated, the Launchpad already taken the
+    // screen, the orbit already arrived. NavPill routes them through
+    // `lumin:jumpTo` rather than scrolling — there is no scroll position that
+    // means "activated", it is state the sections hold themselves.
+    { label: "Ecosystem", anchor: "#ecosystem" },
+    { label: "CTA", anchor: "#cta" },
+    { label: "Schedule", anchor: "#schedule" },
   ],
   // "For You" (#for-you) removed with the Business Type Selector — restore both together.
   cta1: "See Demo",

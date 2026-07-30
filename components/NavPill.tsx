@@ -79,9 +79,28 @@ export default function NavPill() {
     window.location.reload();
   };
 
+  /** Anchors that are STATES, not scroll positions.
+   *  The hub being activated, the Launchpad owning the screen and the orbit
+   *  having arrived are all things the sections hold internally — no scrollY
+   *  expresses them, so scrolling to a y would land in the right place with
+   *  the wrong state (a dead pad, a form that never mounted). Each section
+   *  listens for its own name and puts itself there. */
+  const JUMPS: Record<string, string> = {
+    "#ecosystem": "ecosystem",
+    "#cta": "cta",
+    "#schedule": "schedule",
+  };
+
   const go = (anchor: string) => {
     setMenuOpen(false);
     if (anchor === "#home") return goHome();
+
+    const jump = JUMPS[anchor];
+    if (jump) {
+      releaseGates();
+      window.dispatchEvent(new CustomEvent("lumin:jumpTo", { detail: jump }));
+      return;
+    }
     // The tabs become their own PAGES — the main page stays the cinematic
     // experience end to end. Nothing to scroll to here yet, so a tab is inert
     // until its page exists rather than dumping the visitor mid-film.
@@ -126,7 +145,9 @@ export default function NavPill() {
           </button>
 
           <nav
-            className="font-nav hidden items-center gap-7 text-[13px] font-medium md:flex"
+            // gap-5, not gap-7: eight tabs at 28px apart overran the pill and
+            // pushed the two buttons off the right edge on a 1200px window.
+            className="font-nav hidden items-center gap-5 text-[13px] font-medium lg:flex"
             style={{ color: onLight ? "rgba(33,33,33,0.82)" : "rgba(255,255,255,0.9)" }}
           >
             {NAV.items.map((item) => (
@@ -141,7 +162,7 @@ export default function NavPill() {
             ))}
           </nav>
 
-          <div className="hidden items-center gap-2.5 md:flex">
+          <div className="hidden items-center gap-2.5 lg:flex">
             <button
               className="btn btn-secondary"
               onClick={() => {
@@ -158,7 +179,7 @@ export default function NavPill() {
 
           {/* mobile hamburger */}
           <button
-            className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 md:hidden"
+            className="flex h-10 w-10 flex-col items-center justify-center gap-1.5 lg:hidden"
             onClick={() => setMenuOpen((o) => !o)}
             aria-label="Menu"
             aria-expanded={menuOpen}
@@ -172,7 +193,7 @@ export default function NavPill() {
       {/* mobile menu overlay */}
       {menuOpen && (
         <div
-          className="fixed inset-0 z-40 flex flex-col justify-center gap-8 px-10 md:hidden"
+          className="fixed inset-0 z-[60] flex flex-col justify-center gap-6 px-10 lg:hidden"
           style={{ background: "rgba(33,33,33,0.97)" }}
         >
           {NAV.items.map((item) => (

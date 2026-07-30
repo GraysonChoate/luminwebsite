@@ -102,6 +102,34 @@ const BTN = { x: 330, w: 511, cy: 889, h: 71 };
  *  final surge the biggest of the five. */
 const STOPS = [0, 0.14, 0.34, 0.54, 0.71, 1.0];
 
+/* ── THE BUILD-UP RUNS FAST ────────────────────────────────────────────────
+   Read off the joined 31.1s film, one frame per second:
+     0.0 – 6.0   discharge, the colour drains out of the rings
+     6.0 – 11.0  the mark ignites on the pad
+     11.0 – 14.0 the gate rises and assembles
+     14.0        GATE FULLY FORMED — it then holds to ~16.5 and we fly through
+     17.0 – 24.0 through the gate into warp
+     24.0 – 31.1 starfield, Earth
+   The first 14s is the half that reads as slow, and most of it is rings
+   glowing on a static pad before anything actually builds.
+
+   This speeds up PLAYBACK rather than re-cutting the mp4. Every frame and
+   every crossfade survives, there is no re-encode and no quality cost, and
+   retiming is one number instead of a render — which matters because the back
+   half is going to want its own pass. Rate eases back to normal across the
+   last stretch so the hand-over is not a visible gear change; it lands during
+   the hold on the formed gate, where nothing is moving anyway. */
+const BUILD_END = 14.0;   // seconds into the film — the gate is fully formed
+const BUILD_RATE = 1.75;  // how much faster the build-up runs (14.0s → 8.0s)
+const BUILD_RAMP = 1.5;   // seconds spent easing back down to 1×
+
+function rateAt(t: number) {
+  if (t >= BUILD_END) return 1;
+  if (t <= BUILD_END - BUILD_RAMP) return BUILD_RATE;
+  const k = (t - (BUILD_END - BUILD_RAMP)) / BUILD_RAMP;
+  return BUILD_RATE + (1 - BUILD_RATE) * k;
+}
+
 /** map a source-space rect to screen, matching object-fit: cover */
 function coverRect(vw: number, vh: number, sx: number, sy: number, sw: number, sh: number) {
   const scale = Math.max(vw / SRC_W, vh / SRC_H);
@@ -165,6 +193,9 @@ export default function LaunchpadCTA() {
   const [phase, setPhase] = useState<Phase>("hidden");
   const [values, setValues] = useState<Record<string, string[]>>({});
   const [openPicker, setOpenPicker] = useState<string | null>(null);
+  /** true when the orbit was reached by a nav jump rather than by flying
+   *  there — the backdrop is the arrival still, not the 31s film. */
+  const [orbitStill, setOrbitStill] = useState(false);
   /** Text answers only count once they are COMMITTED with Enter.
    *  Without this the panel lit a row on the first keystroke — you typed one
    *  letter and the gate rewarded you, which made the power-up feel automatic
@@ -223,6 +254,58 @@ export default function LaunchpadCTA() {
     window.addEventListener("lumin:voidArrived", onArrive);
     return () => window.removeEventListener("lumin:voidArrived", onArrive);
   }, []);
+
+  /* ── nav jumps ────────────────────────────────────────────────────────
+     "CTA" and "Schedule" are states this component owns, so it puts itself
+     into them. Jumping anywhere else has to hand the page BACK — the
+     Launchpad is fixed, full-viewport and kills scroll outright, so leaving
+     it mounted would trap the visitor on a section they had just navigated
+     away from. */
+  useEffect(() => {
+    const seize = () => {
+      const lenis = getLenis();
+      lenis?.stop();
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    };
+    const yield_ = () => {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      getLenis()?.start();
+    };
+    const onJump = (e: Event) => {
+      const to = (e as CustomEvent<string>).detail;
+      if (to === "cta") { setOrbitStill(false); setPhase("idle"); seize(); return; }
+      if (to === "schedule") {
+        // Straight to the arrival. Rendering the 31s film here would replay the
+        // whole launch under the cards — and pull 24MB to do it — so the orbit
+        // sits on its own final frame instead.
+        setOrbitStill(true); setPhase("orbit"); seize(); return;
+      }
+      setOrbitStill(false); setPhase("hidden"); yield_();
+    };
+    window.addEventListener("lumin:jumpTo", onJump);
+    return () => window.removeEventListener("lumin:jumpTo", onJump);
+  }, []);
+
+  /* ── drive the build-up faster ────────────────────────────────────────
+     playbackRate has to be re-asserted per frame: setting it once is undone
+     by the element's own load/seek bookkeeping, and the rate has to fall away
+     across BUILD_RAMP anyway. */
+  useEffect(() => {
+    if (phase !== "launching") return;
+    let raf = 0;
+    const tick = () => {
+      const v = filmRef.current;
+      if (v) v.playbackRate = rateAt(v.currentTime);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      if (filmRef.current) filmRef.current.playbackRate = 1;
+    };
+  }, [phase]);
 
   /* ── form completion drives the scrub, easing between stops ──────────── */
   useEffect(() => {
@@ -325,7 +408,7 @@ export default function LaunchpadCTA() {
         </>
       )}
 
-      {(phase === "launching" || phase === "orbit") && (
+      {(phase === "launching" || phase === "orbit") && !orbitStill && (
         <video
           ref={filmRef}
           autoPlay muted playsInline
@@ -334,6 +417,13 @@ export default function LaunchpadCTA() {
         >
           <source src="/void/cta/APPROVED-POSTSUBMIT-31s.mp4" type="video/mp4" />
         </video>
+      )}
+
+      {orbitStill && (
+        <img
+          src="/void/cta/ORBIT-final-frame.png" alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        />
       )}
 
       {/* ── the form. Positioned by the SAME cover transform the video uses,

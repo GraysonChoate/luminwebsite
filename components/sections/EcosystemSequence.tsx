@@ -448,6 +448,41 @@ export default function EcosystemSequence() {
     const onNavRelease = () => releaseScroll();
     window.addEventListener("lumin:releaseGates", onNavRelease);
 
+    /** NAV JUMP — land in the lit hub without playing the road to it.
+     *  Reviewing anything past this point meant scrolling the whole gym, both
+     *  descent gestures and the 6s activation every single time. This puts the
+     *  section in its settled state directly: activated, scrolled to the end
+     *  of the band so the strip shows the hub frame, cue on, suites gone. It
+     *  deliberately re-uses the same flags fireGate/unlock set rather than a
+     *  parallel "preview mode", so what you review is the real state. */
+    const onJump = (e: Event) => {
+      const to = (e as CustomEvent<string>).detail;
+      if (to !== "ecosystem") return;
+      // UNLOCK BEFORE MEASURING. The Launchpad pins overflow:hidden on
+      // <html>/<body> when it takes the screen, which collapses the scrollable
+      // height — and it listens for this same event, but mounts after us, so
+      // its own handler runs too late to help. Measuring first read offsetTop
+      // off the collapsed page and the jump landed at y=408 instead of 2709.
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+      releaseScroll();                    // drop any lock we are already holding
+      ScrollTrigger.refresh();            // re-measure now the page is tall again
+      const pinned = Math.max(1, section.offsetHeight - window.innerHeight);
+      const bandEndY = Math.round(section.offsetTop + pinned * BAND_END);
+      activatedRef.current = true;
+      settledRef.current = true;
+      travellingRef.current = false;
+      setSuites(false);
+      const lenis = getLenis();
+      lenis?.start();
+      lenis?.scrollTo(bandEndY, { immediate: true, force: true });
+      window.scrollTo(0, bandEndY);
+      ScrollTrigger.update();
+      paintStage();
+      setCue(true);
+    };
+    window.addEventListener("lumin:jumpTo", onJump);
+
     const ctx = gsap.context(() => {
       // 0. entry guard — spans the whole time the section touches the
       //    viewport, so it covers the approach that trigger 1 never sees.
@@ -527,6 +562,7 @@ export default function EcosystemSequence() {
     return () => {
       ctx.revert();
       window.removeEventListener("lumin:releaseGates", onNavRelease);
+      window.removeEventListener("lumin:jumpTo", onJump);
       window.clearTimeout(handoff);
       descentGate?.destroy();
       gateTween?.kill();

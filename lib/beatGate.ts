@@ -209,8 +209,23 @@ export function createScrubCatch({
   const onKey = (e: KeyboardEvent) => { if (held >= 0 && KEYS.has(e.key)) e.preventDefault(); };
   const navRelease = () => letGo();
 
+  /** A NAV JUMP CROSSES EVERY ANCHOR AT ONCE — and must catch none of them.
+   *  `lumin:releaseGates` only lets go of the beat being held right now. The
+   *  jump that follows travels the whole section in a single scrollTo, which
+   *  the crossing test reads as "you have just arrived at Loops", so it
+   *  snapped back and pinned there: every jump past the gym landed on the
+   *  first product instead of its destination (measured y=408, wanted 6309).
+   *  Retiring the anchors is the honest fix — the visitor has explicitly said
+   *  they are going somewhere else. */
+  const navJump = () => {
+    letGo();
+    for (let i = 0; i < anchors.length; i++) done.add(i);
+    last = 1;
+  };
+
   window.addEventListener("keydown", onKey);
   window.addEventListener("lumin:releaseGates", navRelease);
+  window.addEventListener("lumin:jumpTo", navJump);
 
   return {
     destroy() {
@@ -220,6 +235,7 @@ export function createScrubCatch({
       window.clearTimeout(holdTimer);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("lumin:releaseGates", navRelease);
+      window.removeEventListener("lumin:jumpTo", navJump);
     },
   };
 }

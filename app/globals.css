@@ -369,6 +369,43 @@ body {
 }
 .nav-tab:hover { color: var(--nav-hot); }
 
+/* the wash — the tab itself lights.
+   Cast from BELOW, at the rail, because that is where the light is coming
+   from: the circuit lights first and the glow spills up over the word. A wash
+   centred on the tab would read as a hover chip on a normal website; thrown
+   from the rail it reads as illumination. It peaks with the spark and settles
+   back to a lower steady level, so the tab stays lit while the pointer is on
+   it without holding the brightest frame of the sweep. */
+.nav-tab::before {
+  content: "";
+  position: absolute;
+  /* generous, because the blur below needs room — a tight box clips the
+     falloff and the clip is a straight edge, which is the whole thing we are
+     trying not to have */
+  inset: -15px -19px -13px -19px;
+  background:
+    radial-gradient(52% 64% at 50% 86%, var(--nav-wash) 0%, transparent 100%),
+    radial-gradient(72% 48% at 50% 60%, var(--nav-wash-soft) 0%, transparent 100%);
+  /* THE BLUR IS THE POINT. Un-blurred, a rounded rect with a soft gradient
+     inside it still reads as a rounded rect — a hover chip like any other
+     website's, which is the opposite of light. Blurred, there is no box left
+     to see and what is on screen is a glow sitting behind the word. It is a
+     static filter: only opacity animates, so the sweep stays composited. */
+  filter: blur(7px);
+  opacity: 0;
+  pointer-events: none;
+}
+.nav-tab:hover::before { animation: navWash .72s ease-out forwards; }
+
+@keyframes navWash {
+  0%   { opacity: 0; }
+  46%  { opacity: 1; }
+  100% { opacity: .66; }
+}
+
+/* keep the letters on top of their own wash */
+.nav-tab-ink { position: relative; z-index: 1; }
+
 /* the rail */
 .nav-tab::after {
   content: "";

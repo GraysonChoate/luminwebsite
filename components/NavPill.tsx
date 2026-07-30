@@ -68,6 +68,8 @@ export default function NavPill() {
         "--nav-spark": "rgba(82,112,255,0.85)",
         "--nav-spark-hot": "#5270ff",
         "--nav-glow": "rgba(82,112,255,0.30)",
+        "--nav-wash": "rgba(82,112,255,0.30)",
+        "--nav-wash-soft": "rgba(82,112,255,0.12)",
       }
     : {
         "--nav-hot": "#ffffff",
@@ -75,6 +77,8 @@ export default function NavPill() {
         "--nav-spark": "rgba(130,160,255,0.95)",
         "--nav-spark-hot": "#ffffff",
         "--nav-glow": "rgba(120,150,255,0.75)",
+        "--nav-wash": "rgba(122,154,255,0.52)",
+        "--nav-wash-soft": "rgba(152,178,255,0.18)",
       };
 
   /** Release every beat gate before navigating.
@@ -227,6 +231,8 @@ export default function NavPill() {
             "--nav-spark": "rgba(130,160,255,0.95)",
             "--nav-spark-hot": "#ffffff",
             "--nav-glow": "rgba(120,150,255,0.75)",
+            "--nav-wash": "rgba(122,154,255,0.52)",
+            "--nav-wash-soft": "rgba(152,178,255,0.18)",
           } as React.CSSProperties}
         >
           {NAV.items.map((item) => (

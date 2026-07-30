@@ -5,8 +5,7 @@ import { gsap, ScrollTrigger } from "@/lib/motion";
 import { HERO, JOURNEY } from "@/lib/copy";
 import SplitChars from "@/components/ui/SplitChars";
 import FrameScrubber from "@/components/ui/FrameScrubber";
-import { createScrubCatch } from "@/lib/beatGate";
-import { createScrollGovernor } from "@/lib/scrollGovernor";
+import { createSceneStepper } from "@/lib/sceneStepper";
 
 /**
  * Cinematic scroll-journey hero — one continuous 7-beat sequence scrubbed by
@@ -91,11 +90,6 @@ const SCENE_LINKS = [
   { product: "Market",    frame: 458, x:  960, y: 550, vx:  13.7, vy:  6.6, dx: -214, dy: -192 },
 ];
 
-/** How many frames either side of the catch the callout is on screen. Tight,
- *  because it TRACKS the object rather than sitting at a fixed spot, and a
- *  straight-line track only holds for so long. */
-const LINK_SPAN = 14;
-
 /* ── THE CALLOUT FOLLOWS THE OBJECT ───────────────────────────────────────
    The camera moves, so the thing a link points at moves with it. A fixed
    coordinate is only right on the catch frame; a few frames either side the
@@ -160,19 +154,19 @@ export default function Hero() {
   const progressRef = useRef(0);
   const [variant, setVariant] = useState<"desktop" | "mobile">("desktop");
   const [openingDone, setOpeningDone] = useState(false); // orb-emerge loader lifted
-  /** which gate stop we are parked on; -1 while a beat is travelling.
+  /** which product we are STOPPED on; -1 whenever the film is moving.
+   *  Set by the stepper on arrival — never by how close the frame happens to
+   *  be to an anchor, which is what used to slide it into shot early.
    *  NOT named `stop` — that resolves to the global `window.stop`. */
-  /** which scene's callout is on screen, by FRAME — not by catch */
   const [sceneIdx, setSceneIdx] = useState(-1);
-  /** the frame the callout should track to, updated every scroll tick */
+  /** parked at a product and waiting to be asked to move on */
+  const [resting, setResting] = useState(false);
+  /** the frame the callout is pinned to */
   const frameRef = useRef(0);
-  const [, force] = useState(0);
-  useEffect(() => {
-    let raf = 0;
-    const tick = () => { force((n) => n + 1); raf = requestAnimationFrame(tick); };
-    if (sceneIdx >= 0) raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [sceneIdx]);
+  /* The 60fps re-render loop that used to live here is GONE. It existed to keep
+     the callout glued to a moving object; the callout now only exists while the
+     film is stopped, so there is nothing to track and forcing a React render
+     every frame was pure cost on the section that could least afford it. */
   const [vp, setVp] = useState({ w: 0, h: 0 });
   /** MEMOISED, and it matters enormously. This was built inline in the JSX, so
    *  every render produced a NEW array — which is a new dependency for the
@@ -217,19 +211,24 @@ export default function Hero() {
     let onMove: ((e: PointerEvent) => void) | null = null;
     const ctx = gsap.context(() => {
       // 1. frame scrub across the pinned walk (piecewise-shaped).
-      // scrub: 0.6 eases progress toward the scroll position instead of
-      // locking 1:1 — glides the 12fps frame steps and softens wheel jolts.
+      // 0.18, not 0.6. The long ease existed to smooth raw wheel jolts, but
+      // scroll is no longer raw — the stepper drives it with an eased tween, so
+      // the smoothing is already done upstream and all a big scrub adds is lag.
+      // At 0.6 the picture was still drifting for half a second after the
+      // scroll had stopped, which is the opposite of the hard stop the product
+      // moments need.
       ScrollTrigger.create({
         trigger: section,
         start: "top top",
         end: "bottom bottom",
-        scrub: 0.6,
+        scrub: 0.18,
         onUpdate: (self) => {
           progressRef.current = self.progress;
-          const f = self.progress * LAST;
-          frameRef.current = f;
-          const i = SCENE_LINKS.findIndex((s) => Math.abs(f - s.frame) <= LINK_SPAN);
-          setSceneIdx((prev) => (prev === i ? prev : i));
+          frameRef.current = self.progress * LAST;
+          // NOTE: the callout is NOT chosen here any more. It used to appear
+          // whenever the frame came within LINK_SPAN of an anchor, which meant
+          // it drifted into shot while the film was still travelling. The
+          // stepper decides now, on arrival.
         },
       });
 
@@ -331,30 +330,24 @@ export default function Hero() {
       }
     }, section);
 
-    // 4. THE GATE. Mounted after the scrubbed rig above, deliberately: the gate
+    // 4. THE STEPPER. Mounted after the scrubbed rig above, deliberately: it
     //    animates SCROLL rather than frames, so every rule built above keeps
     //    driving itself off its own ScrollTrigger with nothing to keep in sync.
-    let caught = false;
-    let governor: ReturnType<typeof createScrollGovernor> | null = null;
-    const gate = createScrubCatch({
+    //    One gesture = one scene, at a fixed tempo, full stop at the product.
+    //    See lib/sceneStepper.ts for why nothing is allowed to accumulate.
+    const stepper = createSceneStepper({
       section,
       anchors: ANCHORS,
-      onCatch: () => { caught = true; },
-      onRelease: () => { caught = false; },
-      // a beat holds until YOU ask for more, not until a clock runs out
-      wantsMore: () => governor?.pending() ?? 1,
-    });
-    // An even tempo between the products, whatever the hand does. The catches
-    // decide WHERE it stops; this decides how fast it travels in between —
-    // previously that was entirely down to how hard you flicked, and the arrow
-    // keys jumped a whole scene at a time.
-    governor = createScrollGovernor({
-      section, maxPxPerSec: 340, keyStep: 340, paused: () => caught,
+      // The callout is bound to ARRIVAL, not to the frame being nearby. Driving
+      // it off frame proximity is what made it slide into shot ahead of the
+      // stop; now it appears at the freeze and nowhere else.
+      onDepart: () => { setSceneIdx(-1); setResting(false); },
+      onArrive: (i) => { setSceneIdx(i); setResting(true); },
+      onExit: () => { setSceneIdx(-1); setResting(false); },
     });
 
     return () => {
-      governor?.destroy();
-      gate.destroy();
+      stepper.destroy();
       if (onMove) section.removeEventListener("pointermove", onMove);
       ctx.revert();
     };
@@ -432,6 +425,9 @@ export default function Hero() {
               <a
                 href={`#product-${link.product.toLowerCase()}`}
                 className="hero-brief pointer-events-auto absolute"
+                // which side of the node it hangs off — the pop scales out from
+                // the node's side, so it reads as coming OUT of the object
+                data-side={leftward ? "l" : "r"}
                 style={{
                   left: lx + (leftward ? -26 : 26),
                   top: ly,
@@ -445,6 +441,26 @@ export default function Hero() {
             </div>
           );
         })()}
+
+        {/* ── SCROLL TO CONTINUE ──────────────────────────────────────────
+               Only while parked on a product. The film will not move until it
+               is asked to, so the ask has to be on screen — without it a full
+               stop is indistinguishable from a page that has frozen. It sits
+               under the caption band, out of the callout's way. */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-[5vh] z-[6] flex justify-center"
+          style={{
+            opacity: resting ? 1 : 0,
+            transform: resting ? "translateY(0)" : "translateY(8px)",
+            transition: "opacity .45s ease, transform .45s ease",
+          }}
+          aria-hidden={!resting}
+        >
+          <span className="hero-continue font-nav">
+            Scroll to continue
+            <i className="hero-continue-chev" aria-hidden="true" />
+          </span>
+        </div>
 
         {/* legibility scrim for the lower caption band */}
         <div

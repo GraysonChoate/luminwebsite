@@ -230,13 +230,19 @@ body {
 @keyframes heroCueDraw { from { stroke-dashoffset: 260 } to { stroke-dashoffset: 0 } }
 @keyframes heroCuePulse{ 0%,100% { opacity:.55; r:3 } 50% { opacity:1; r:4.6 } }
 
-.hero-cue-line { stroke-dasharray: 260; animation: heroCueDraw .75s cubic-bezier(.16,.84,.44,1) both; }
+/* The elbow draws FIRST, out of the object, and the brief pops off the end of
+   it — so the order on screen is: node lights, line runs, brief arrives. That
+   sequence is what makes it read as coming out of the thing it points at
+   rather than fading in on top of the shot. Faster than it was, because it now
+   only ever plays once we have come to a full stop; it no longer has to cover
+   travel. */
+.hero-cue-line { stroke-dasharray: 260; animation: heroCueDraw .42s cubic-bezier(.16,.84,.44,1) both; }
 .hero-cue-core { animation: heroCuePulse 2.6s ease-in-out infinite; }
 
 .hero-brief {
   display: inline-flex; align-items: baseline; gap: .7em;
   padding: .92rem 1.5rem .92rem 1.6rem;
-  animation: heroCueIn .6s .18s both;
+  animation: none;   /* replaced by the side-aware pop below */
   font-family: var(--font-montserrat), system-ui, sans-serif;
   color: #eaf2ff;
   background: linear-gradient(180deg, rgba(20,34,66,.78), rgba(10,18,38,.7));
@@ -466,4 +472,69 @@ body {
   .nav-tab:hover .nav-tab-ink { animation: none; }
   .nav-tab::after { transition: opacity .2s ease; }
   .nav-tab:hover::after { transform: scaleX(1); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   THE BRIEF POPS OUT OF THE OBJECT
+
+   It used to drift into shot while the film was still moving, because it was
+   shown whenever the frame came within fourteen frames of an anchor. It is now
+   bound to the STOP — the stepper mounts it on arrival and nowhere else — so
+   this animation only ever plays against a frozen picture, and it can be a
+   short, definite pop instead of a long fade that had to cover travel.
+
+   It scales out from whichever side the node is on, following the elbow that
+   has just drawn out of the object, so the motion reads as the brief emerging
+   from the thing rather than appearing on top of the shot. Two variants
+   because the base transform differs: a leftward brief is translated back by
+   its own width, and an animation has to carry that or it jumps.
+   ══════════════════════════════════════════════════════════════════════════ */
+.hero-brief[data-side="r"] {
+  transform-origin: left center;
+  animation: heroBriefPopR .36s .3s cubic-bezier(.2,1.25,.4,1) both;
+}
+.hero-brief[data-side="l"] {
+  transform-origin: right center;
+  animation: heroBriefPopL .36s .3s cubic-bezier(.2,1.25,.4,1) both;
+}
+@keyframes heroBriefPopR {
+  from { opacity: 0; transform: translateY(-50%) translateX(-16px) scale(.84); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0)     scale(1);   }
+}
+@keyframes heroBriefPopL {
+  from { opacity: 0; transform: translateY(-50%) translateX(-100%) translateX(16px) scale(.84); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(-100%) translateX(0)    scale(1);   }
+}
+
+/* ── SCROLL TO CONTINUE ───────────────────────────────────────────────────
+   The film now stops dead at each product and will not move until it is
+   asked. That makes the prompt load-bearing rather than decorative: with no
+   ask on screen, a deliberate full stop and a hung page look identical. */
+.hero-continue {
+  display: inline-flex; align-items: center; gap: .85em;
+  padding: .62rem 1.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(190,215,255,.30);
+  background: rgba(10,14,24,.42);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  font-size: 11px; font-weight: 600; letter-spacing: .28em; text-transform: uppercase;
+  color: rgba(226,238,255,.92);
+  text-shadow: 0 1px 10px rgba(10,10,15,.7);
+}
+/* a chevron that keeps nudging downward — the direction of the ask */
+.hero-continue-chev {
+  width: 7px; height: 7px;
+  border-right: 1.5px solid rgba(190,215,255,.85);
+  border-bottom: 1.5px solid rgba(190,215,255,.85);
+  transform: rotate(45deg);
+  animation: heroContinueNudge 1.9s ease-in-out infinite;
+}
+@keyframes heroContinueNudge {
+  0%, 100% { transform: rotate(45deg) translate(0, 0);       opacity: .55; }
+  50%      { transform: rotate(45deg) translate(2px, 2px);   opacity: 1;   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-brief[data-side="r"], .hero-brief[data-side="l"] { animation-duration: .01s; }
+  .hero-continue-chev { animation: none; }
 }

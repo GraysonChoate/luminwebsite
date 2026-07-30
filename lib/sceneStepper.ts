@@ -131,6 +131,18 @@ export function createSceneStepper({
   const yFor = (p: number) => Math.round(section.offsetTop + span() * p);
   const endY = () => Math.round(section.offsetTop + span());
 
+  /** Which anchor the page is ACTUALLY at or past, read off scroll position.
+   *  `at` cannot be trusted across a disengage: the nav can carry the visitor
+   *  to the ecosystem and they can scroll back up into the journey, at which
+   *  point the remembered index belongs to a scene they left. Stepping from it
+   *  threw them from y=900 to y=4273 — past the whole film in one gesture. */
+  const indexAt = (y: number) => {
+    const p = (y - section.offsetTop) / span();
+    let i = -1;
+    for (let k = 0; k < anchors.length; k++) if (p >= anchors[k] - 0.004) i = k;
+    return i;
+  };
+
   const block = (e: Event) => e.preventDefault();
 
   /** while resting, the page does not move. Anything that nudges it is undone. */
@@ -228,6 +240,8 @@ export function createSceneStepper({
     if (engaged) return;
     engaged = true;
     restY = window.scrollY;
+    // Re-derive rather than resume. See indexAt.
+    at = indexAt(window.scrollY);
     getLenis()?.stop();
     window.addEventListener("wheel", block, { passive: false });
     window.addEventListener("touchmove", block, { passive: false });
@@ -266,6 +280,25 @@ export function createSceneStepper({
     end: "bottom bottom",
     onToggle: (self) => (self.isActive ? engage() : disengage()),
   });
+
+  /** RE-PIN ON RESIZE. The section is sized in vh, so changing the window
+   *  changes how much scroll the film spans — and the scroll position we were
+   *  resting at then lands on a different FRAME. Measured: parked on Trainer
+   *  (frame 178) at a 900px-tall window, resizing to 700 left scroll untouched
+   *  and slid the picture to frame 229, so the callout was pointing at
+   *  something no longer under it. Anchors are held in progress space, so the
+   *  fix is simply to recompute this one's pixel position and go back to it.
+   *  Runs off ScrollTrigger's own refresh so the new geometry is already in. */
+  const onRefresh = () => {
+    if (!engaged || travelling) return;
+    if (at >= 0 && at < anchors.length) {
+      restY = yFor(anchors[at]);
+      window.scrollTo(0, restY);
+    } else {
+      restY = window.scrollY;
+    }
+  };
+  ScrollTrigger.addEventListener("refresh", onRefresh);
   // a section pinned at scrollY 0 reads as inactive until scroll crosses it
   const r = section.getBoundingClientRect();
   if (r.top <= 0 && r.bottom >= window.innerHeight) engage();
@@ -278,6 +311,7 @@ export function createSceneStepper({
     destroy() {
       disengage();
       watcher.kill();
+      ScrollTrigger.removeEventListener("refresh", onRefresh);
       window.removeEventListener("lumin:releaseGates", bail);
       window.removeEventListener("lumin:jumpTo", bail);
     },

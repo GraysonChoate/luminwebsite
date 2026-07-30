@@ -204,7 +204,19 @@ export default function EcosystemSequence() {
     };
     // Lenis being stopped does NOT stop a scrollbar drag, so hold the position
     // natively too. `pinnedTo` is advanced by the gate tween as it plays.
-    const holdScroll = () => { if (window.scrollY !== pinnedTo) window.scrollTo(0, pinnedTo); };
+    /** RE-ASSERT THE STOP, don't just re-pin.
+     *  Blocking wheel with preventDefault only stops the BROWSER scrolling —
+     *  Lenis has its own wheel listener and scrolls programmatically, so a
+     *  running Lenis walks straight through the block. Measured at the lit hub:
+     *  20 of 20 wheel events defaultPrevented, and the page still glided from
+     *  6309 all the way back to 3598, out of the section entirely. Whoever
+     *  restarted Lenis (the section is handed back and forth between three
+     *  different owners here) no longer matters if the lock reasserts itself
+     *  every scroll — which is what beatGate's own hold() already does. */
+    const holdScroll = () => {
+      getLenis()?.stop();
+      if (window.scrollY !== pinnedTo) window.scrollTo(0, pinnedTo);
+    };
 
     /** the living hub fades in over the strip's last frame, and back out of it
      *  going the other way — one scroll-driven rule, so both directions match */
@@ -479,7 +491,26 @@ export default function EcosystemSequence() {
       window.scrollTo(0, bandEndY);
       ScrollTrigger.update();
       paintStage();
-      setCue(true);
+
+      /* THEN HAND OVER TO seize(), which is the same thing that pins this
+         section when it is reached normally. The lit hub is a terminal state —
+         scroll does nothing and the two controls are the only way out — and
+         arriving by ACTIVATE leaves that lock standing. Arriving by nav jump
+         had gone through releaseScroll() and left scroll FREE, so the same
+         screen behaved two different ways depending on how you got to it, and
+         a wheel from the hub wandered off into the middle of the descent.
+
+         Re-locking by hand here did not work either: seize() runs off a
+         per-frame geometry check and simply ran afterwards, overwriting the
+         pin. Calling it deliberately is both shorter and the only version that
+         cannot drift from the real path — it reads activatedRef itself and
+         pins to BAND_END, sets settled, raises the cue and attaches every
+         listener. `stepRef` is wound to the end of the descent because the orb
+         IS down: without it a later seize would pin back to a descent step. */
+      stepRef.current = DESCENT_STEPS.length - 1;
+      heldRef.current = false;
+      exitingRef.current = false;
+      seize();
     };
     window.addEventListener("lumin:jumpTo", onJump);
 

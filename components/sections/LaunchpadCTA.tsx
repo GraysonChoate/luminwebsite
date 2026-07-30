@@ -116,18 +116,40 @@ const STOPS = [0, 0.14, 0.34, 0.54, 0.71, 1.0];
    This speeds up PLAYBACK rather than re-cutting the mp4. Every frame and
    every crossfade survives, there is no re-encode and no quality cost, and
    retiming is one number instead of a render — which matters because the back
-   half is going to want its own pass. Rate eases back to normal across the
-   last stretch so the hand-over is not a visible gear change; it lands during
-   the hold on the formed gate, where nothing is moving anyway. */
-const BUILD_END = 14.0;   // seconds into the film — the gate is fully formed
-const BUILD_RATE = 1.75;  // how much faster the build-up runs (14.0s → 8.0s)
-const BUILD_RAMP = 1.5;   // seconds spent easing back down to 1×
+   half wanted its own pass too. Every change of rate eases in across RAMP
+   seconds rather than switching, so none of them reads as a gear change — and
+   each boundary is placed where the picture is already still or repeating,
+   which is where a speed change is invisible.
+
+   Retiming is this table and nothing else. */
+const RAMP = 1.5;         // seconds spent easing into each new rate
+
+const BANDS = [
+  // discharge → the mark ignites → the gate assembles. Most of it is rings
+  // glowing on a static pad, which is the part that read as slow.
+  { from: 0.0,  rate: 1.75 },
+  // GATE FULLY FORMED. It holds here and the camera flies through — the shot
+  // the whole build-up was for, so it plays at its own pace.
+  { from: 14.0, rate: 1.0  },
+  // The starfield: five seconds of near-identical streaks with nothing
+  // arriving. The most repetitive stretch in the film and the easiest to run
+  // hard without losing anything.
+  { from: 23.5, rate: 2.0  },
+  // EARTH ARRIVES — its limb enters bottom-right at 28.5 and grows to the
+  // resting frame. This is the payoff and the last thing on screen; it is
+  // never sped up.
+  { from: 28.6, rate: 1.0  },
+];
 
 function rateAt(t: number) {
-  if (t >= BUILD_END) return 1;
-  if (t <= BUILD_END - BUILD_RAMP) return BUILD_RATE;
-  const k = (t - (BUILD_END - BUILD_RAMP)) / BUILD_RAMP;
-  return BUILD_RATE + (1 - BUILD_RATE) * k;
+  let i = 0;
+  while (i + 1 < BANDS.length && t >= BANDS[i + 1].from) i++;
+  const cur = BANDS[i].rate;
+  const next = BANDS[i + 1];
+  if (!next) return cur;
+  const d = next.from - t;                       // time until the next rate
+  if (d >= RAMP) return cur;
+  return cur + (next.rate - cur) * (1 - d / RAMP);
 }
 
 /** map a source-space rect to screen, matching object-fit: cover */

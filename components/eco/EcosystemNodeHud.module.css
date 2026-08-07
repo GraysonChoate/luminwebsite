@@ -1,0 +1,1192 @@
+.stage {
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  background: #000;
+  color: #f7fbff;
+  font-family: var(--font-heebo), Inter, system-ui, sans-serif;
+}
+
+/* Size container for the node coordinate space. Its box matches exactly what
+   .ecosystem occupied before, so the rendered video is unchanged. */
+.videoBox {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: size;
+}
+
+.ecosystem {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: saturate(1.03) contrast(1.04);
+}
+
+/* Reproduces the video's object-fit: cover rect in CSS, so % positions inside
+   it are percentages of the VIDEO FRAME rather than of the page box.
+   --px/--py mirror the object-position of .ecosystem at each breakpoint. */
+.hotspotFrame {
+  --px: 0.5;
+  --py: 0.5;
+  --frame-w: max(100cqw, 100cqh * 16 / 9);
+  --frame-h: max(100cqh, 100cqw * 9 / 16);
+  position: absolute;
+  width: var(--frame-w);
+  height: var(--frame-h);
+  left: calc((100cqw - var(--frame-w)) * var(--px));
+  top: calc((100cqh - var(--frame-h)) * var(--py));
+  pointer-events: none;
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 34% 54%, transparent 0 18%, rgba(0, 0, 0, 0.16) 38%, rgba(0, 0, 0, 0.72) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.28), transparent 26%, transparent 70%, rgba(0, 0, 0, 0.44));
+  pointer-events: none;
+}
+
+.scanlines {
+  position: absolute;
+  inset: 0;
+  opacity: 0.24;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px) 0 0 / 100% 5px,
+    linear-gradient(90deg, transparent 0 49.94%, rgba(116, 151, 255, 0.5) 49.98% 50.02%, transparent 50.06%);
+}
+
+.stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.22;
+  background:
+    linear-gradient(110deg, transparent 0 28%, rgba(82, 112, 255, 0.18) 34%, transparent 41%),
+    linear-gradient(70deg, transparent 0 58%, rgba(134, 51, 153, 0.15) 64%, transparent 72%);
+  mix-blend-mode: screen;
+  animation: stageLightDrift 8s ease-in-out infinite;
+}
+
+.stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.18;
+  background:
+    radial-gradient(circle at 32% 48%, rgba(82, 112, 255, 0.28), transparent 10%),
+    radial-gradient(circle at 62% 50%, rgba(134, 51, 153, 0.16), transparent 12%);
+  mix-blend-mode: screen;
+  animation: nodeFieldBreath 5.8s ease-in-out infinite;
+}
+
+.hotspotLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.hotspot {
+  pointer-events: auto;
+  position: absolute;
+  width: clamp(76px, 6.2vw, 118px);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  translate: -50% -50%;
+  cursor: pointer;
+  background: transparent;
+  opacity: 0;
+}
+
+.hotspot:focus-visible {
+  outline: 1px solid rgba(145, 200, 255, 0.72);
+  outline-offset: 6px;
+  box-shadow: 0 0 22px rgba(82, 112, 255, 0.5);
+  opacity: 1;
+}
+
+.hotspotActive {
+  opacity: 0;
+}
+
+/* CENTRED, at every width. This was right-anchored, which parked the dossier
+   over the Lumin One half of the hologram and read as belonging to whatever
+   node happened to sit under it. The panel is a dossier for ONE node, so it
+   should not favour either side of the ecosystem. */
+.panel {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  width: min(740px, calc(100vw - 44px));
+  max-height: min(830px, calc(100svh - 48px));
+  padding: clamp(22px, 2.1vw, 34px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(145, 200, 255, 0.44) rgba(2, 8, 18, 0.2);
+  border: 1px solid rgba(133, 184, 255, 0.34);
+  background:
+    linear-gradient(135deg, rgba(8, 16, 34, 0.88), rgba(6, 9, 19, 0.64) 56%, rgba(20, 38, 74, 0.76)),
+    radial-gradient(circle at 12% 0%, rgba(82, 112, 255, 0.32), transparent 34%),
+    radial-gradient(circle at 88% 100%, rgba(64, 220, 255, 0.16), transparent 42%);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 20px 100px rgba(0, 0, 0, 0.76),
+    0 0 90px rgba(82, 112, 255, 0.18);
+  backdrop-filter: blur(24px) saturate(1.24);
+  -webkit-backdrop-filter: blur(24px) saturate(1.24);
+  transform: translate3d(-50%, calc(-50% + 14px), 0) rotateX(2deg) scale(0.96);
+  transform-origin: 50% 52%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 420ms ease, transform 520ms cubic-bezier(.2,.8,.2,1);
+}
+
+.panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.panel::-webkit-scrollbar-track {
+  background: rgba(2, 8, 18, 0.22);
+}
+
+.panel::-webkit-scrollbar-thumb {
+  background: rgba(145, 200, 255, 0.44);
+}
+
+.panelOpen {
+  transform: translate3d(0, -50%, 0) rotateX(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.panelBlue {
+  --hud-accent: #5270ff;
+  --hud-accent-soft: rgba(82, 112, 255, 0.34);
+  --hud-accent-line: rgba(145, 200, 255, 0.58);
+}
+
+.panelViolet {
+  --hud-accent: #9a72ff;
+  --hud-accent-soft: rgba(154, 114, 255, 0.32);
+  --hud-accent-line: rgba(190, 166, 255, 0.58);
+}
+
+.panelOpen .panelHeader,
+.panelOpen .coreBrief,
+.panelOpen .proofStrip,
+.panelOpen .capabilityGrid article,
+.panelOpen .signalPanel,
+.panelOpen .panelFooter {
+  animation: moduleMaterialize 640ms cubic-bezier(.2,.8,.2,1) both;
+}
+
+.panelOpen .coreBrief { animation-delay: 80ms; }
+.panelOpen .proofStrip { animation-delay: 180ms; }
+.panelOpen .capabilityGrid article:nth-child(1) { animation-delay: 250ms; }
+.panelOpen .capabilityGrid article:nth-child(2) { animation-delay: 290ms; }
+.panelOpen .capabilityGrid article:nth-child(3) { animation-delay: 330ms; }
+.panelOpen .capabilityGrid article:nth-child(4) { animation-delay: 370ms; }
+.panelOpen .capabilityGrid article:nth-child(5) { animation-delay: 410ms; }
+.panelOpen .capabilityGrid article:nth-child(6) { animation-delay: 450ms; }
+.panelOpen .signalPanel { animation-delay: 530ms; }
+.panelOpen .panelFooter { animation-delay: 610ms; }
+
+.panelFrame {
+  position: absolute;
+  inset: 8px;
+  border: 1px solid rgba(192, 224, 255, 0.13);
+  pointer-events: none;
+  clip-path: polygon(0 0, calc(100% - 44px) 0, 100% 44px, 100% 100%, 44px 100%, 0 calc(100% - 44px));
+}
+
+.panelFrame::before,
+.panelFrame::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.panelFrame::before {
+  left: 18px;
+  right: 18px;
+  top: 56px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(145, 200, 255, 0.42), transparent);
+}
+
+.panelFrame::after {
+  top: 18px;
+  bottom: 18px;
+  right: 78px;
+  width: 1px;
+  background: linear-gradient(transparent, rgba(145, 200, 255, 0.3), transparent);
+}
+
+.panel::before,
+.panel::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.panel::before {
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(145, 200, 255, 0.9), transparent);
+  animation: scanSweep 4.8s ease-in-out infinite;
+}
+
+.panel::after {
+  inset: 0;
+  opacity: 0.18;
+  background:
+    linear-gradient(90deg, transparent 0 7%, rgba(145, 200, 255, 0.18) 7.1% 7.2%, transparent 7.3%),
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 100% 6px;
+  mix-blend-mode: screen;
+}
+
+.panelHeader {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.titleCluster {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.productBadge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(58px, 4.9vw, 76px);
+  aspect-ratio: 1;
+  color: #f6fbff;
+  border: 1px solid color-mix(in srgb, var(--hud-accent) 62%, white 18%);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 255, 255, 0.18), transparent 36%),
+    radial-gradient(circle at 50% 50%, var(--hud-accent-soft), transparent 68%),
+    rgba(4, 10, 24, 0.72);
+  box-shadow:
+    0 0 22px var(--hud-accent-soft),
+    0 0 58px color-mix(in srgb, var(--hud-accent) 30%, transparent),
+    inset 0 0 20px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  animation: productBadgePulse 3.4s ease-in-out infinite;
+}
+
+.productBadge::before,
+.productBadge::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  border: 1px solid color-mix(in srgb, var(--hud-accent) 48%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.productBadge::after {
+  inset: 15px;
+  opacity: 0.58;
+}
+
+.productIcon {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 58%;
+  height: 58%;
+  background: linear-gradient(135deg, #ffffff, color-mix(in srgb, var(--hud-accent) 78%, white 22%));
+  -webkit-mask: var(--symbol-url) center / contain no-repeat;
+  mask: var(--symbol-url) center / contain no-repeat;
+  filter:
+    drop-shadow(0 0 7px var(--hud-accent))
+    drop-shadow(0 0 18px var(--hud-accent));
+}
+
+.kicker {
+  margin: 0 0 10px;
+  color: color-mix(in srgb, var(--hud-accent) 62%, white 38%);
+  font-family: var(--font-montserrat), Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.panelHeader h1 {
+  max-width: 620px;
+  margin: 0;
+  font-size: clamp(30px, 3vw, 52px);
+  line-height: 0.96;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.close {
+  position: relative;
+  flex: 0 0 42px;
+  height: 42px;
+  border: 1px solid rgba(199, 228, 255, 0.24);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.close span {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 20px;
+  height: 1px;
+  background: #eaf6ff;
+}
+
+.close span:first-child {
+  rotate: 45deg;
+}
+
+.close span:last-child {
+  rotate: -45deg;
+}
+
+.coreBrief {
+  position: relative;
+  margin-top: 26px;
+  padding: 18px 20px;
+  border-left: 1px solid var(--hud-accent-line);
+  background: linear-gradient(90deg, var(--hud-accent-soft), transparent);
+}
+
+.coreBrief p {
+  margin: 0;
+  max-width: 64ch;
+  color: rgba(238, 248, 255, 0.86);
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.proofStrip {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin-top: 22px;
+  border: 1px solid rgba(145, 200, 255, 0.18);
+  background: rgba(145, 200, 255, 0.12);
+}
+
+.proofStrip div {
+  position: relative;
+  min-width: 0;
+  padding: 16px 16px 18px;
+  background: rgba(4, 10, 24, 0.68);
+  overflow: hidden;
+}
+
+.proofStrip div::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--hud-accent), rgba(64, 220, 255, 0.42), transparent);
+  transform: translateX(-70%);
+  animation: dataRail 3.8s ease-in-out infinite;
+}
+
+.proofStrip div:nth-child(2)::after { animation-delay: 260ms; }
+.proofStrip div:nth-child(3)::after { animation-delay: 520ms; }
+
+.proofStrip span,
+.signalRow span {
+  display: block;
+  color: rgba(214, 234, 255, 0.56);
+  font-family: var(--font-montserrat), Inter, system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}
+
+.proofStrip strong {
+  display: block;
+  margin-top: 8px;
+  color: #fff;
+  font-family: var(--font-montserrat), Inter, system-ui, sans-serif;
+  font-size: clamp(15px, 1.1vw, 18px);
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.capabilityGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.capabilityGrid article {
+  position: relative;
+  min-height: 118px;
+  padding: 16px;
+  border: 1px solid rgba(145, 200, 255, 0.15);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.02)),
+    rgba(2, 8, 18, 0.52);
+  overflow: hidden;
+  transition: border-color 260ms ease, background 260ms ease, transform 260ms ease;
+}
+
+.capabilityGrid article::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: linear-gradient(120deg, transparent, rgba(145, 200, 255, 0.16), transparent);
+  transform: translateX(-120%);
+  transition: opacity 260ms ease;
+}
+
+.capabilityGrid article:hover {
+  border-color: rgba(145, 200, 255, 0.38);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.035)),
+    rgba(4, 12, 28, 0.68);
+  transform: translateY(-2px);
+}
+
+.capabilityGrid article:hover::before {
+  opacity: 1;
+  animation: cardGlint 1100ms ease;
+}
+
+.capabilityGrid h2,
+.signalPanel h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.capabilityGrid p {
+  margin: 10px 0 0;
+  color: rgba(238, 248, 255, 0.68);
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.signalPanel {
+  display: grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid rgba(82, 112, 255, 0.24);
+  background: radial-gradient(circle at 0 50%, var(--hud-accent-soft), transparent 58%);
+  overflow: hidden;
+  position: relative;
+}
+
+.signalPanel::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(64, 220, 255, 0.72), transparent);
+  animation: signalPulse 3.3s ease-in-out infinite;
+}
+
+.signalPanel h2 {
+  font-size: clamp(20px, 1.9vw, 30px);
+}
+
+.signalStack {
+  display: grid;
+  gap: 8px;
+}
+
+.signalRow {
+  display: grid;
+  grid-template-columns: 0.65fr 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid rgba(145, 200, 255, 0.14);
+}
+
+.signalRow:last-child {
+  border-bottom: 0;
+}
+
+.signalRow strong {
+  color: rgba(246, 251, 255, 0.9);
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 500;
+}
+
+.panelFooter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.panelFooter span {
+  padding: 8px 10px;
+  border: 1px solid rgba(145, 200, 255, 0.18);
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(238, 248, 255, 0.74);
+  font-family: var(--font-montserrat), Inter, system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1320px), (max-height: 860px) {
+  .panel {
+    right: clamp(16px, 2.2vw, 36px);
+    width: min(690px, calc(100vw - 36px));
+    max-height: calc(100svh - 32px);
+    padding: 22px;
+  }
+
+  .panelHeader h1 {
+    font-size: clamp(28px, 2.45vw, 42px);
+  }
+
+  .coreBrief {
+    margin-top: 16px;
+    padding: 14px 16px;
+  }
+
+  .coreBrief p {
+    font-size: 14px;
+    line-height: 1.45;
+  }
+
+  .proofStrip {
+    margin-top: 16px;
+  }
+
+  .proofStrip div {
+    padding: 13px 14px 15px;
+  }
+
+  .capabilityGrid {
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .capabilityGrid article {
+    min-height: 96px;
+    padding: 14px;
+  }
+
+  .capabilityGrid h2,
+  .signalPanel h2 {
+    font-size: 16px;
+  }
+
+  .capabilityGrid p,
+  .signalRow strong {
+    font-size: 13px;
+  }
+
+  .signalPanel {
+    gap: 14px;
+    margin-top: 14px;
+    padding: 14px;
+  }
+
+  .signalRow {
+    padding: 9px 0;
+  }
+
+  .panelFooter {
+    margin-top: 14px;
+  }
+}
+
+@media (max-width: 1120px) {
+  .ecosystem {
+    object-position: 38% center;
+  }
+
+  .hotspotFrame {
+    --px: 0.38;
+  }
+
+  .panel {
+    right: 14px;
+    width: min(610px, calc(100vw - 28px));
+  }
+
+  .panelHeader h1 {
+    font-size: clamp(26px, 3.2vw, 36px);
+  }
+
+  .signalPanel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes scanSweep {
+  0%, 100% {
+    opacity: 0.24;
+    transform: translateX(-18%);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateX(18%);
+  }
+}
+
+@keyframes stageLightDrift {
+  0%, 100% {
+    transform: translate3d(-2%, 0, 0);
+  }
+  50% {
+    transform: translate3d(2%, -1%, 0);
+  }
+}
+
+@keyframes nodeFieldBreath {
+  0%, 100% {
+    opacity: 0.12;
+  }
+  50% {
+    opacity: 0.24;
+  }
+}
+
+@keyframes moduleMaterialize {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    filter: blur(0);
+  }
+}
+
+@keyframes dataRail {
+  0%, 100% {
+    transform: translateX(-76%);
+    opacity: 0.28;
+  }
+  52% {
+    transform: translateX(76%);
+    opacity: 0.95;
+  }
+}
+
+@keyframes cardGlint {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes productBadgePulse {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: translate3d(0, -1px, 0) scale(1.035);
+    filter: brightness(1.16);
+  }
+}
+
+@keyframes signalPulse {
+  0%, 100% {
+    transform: translateX(-70%);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateX(70%);
+    opacity: 0.85;
+  }
+}
+
+@media (max-width: 920px) {
+  .videoBox {
+    height: 62svh;
+    min-height: 420px;
+  }
+
+  .ecosystem {
+    object-position: 36% center;
+  }
+
+  .hotspotFrame {
+    --px: 0.36;
+  }
+
+  .panel {
+    left: 16px;
+    right: 16px;
+    top: auto;
+    bottom: 16px;
+    width: auto;
+    max-height: min(74svh, 720px);
+    padding: 20px;
+    transform: translate3d(0, 22px, 0) scale(0.98);
+    transform-origin: center bottom;
+  }
+
+  .panelOpen {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  .proofStrip,
+  .capabilityGrid,
+  .signalPanel {
+    grid-template-columns: 1fr;
+  }
+
+  .panelHeader {
+    gap: 14px;
+  }
+
+  .titleCluster {
+    gap: 14px;
+  }
+
+  .productBadge {
+    width: 58px;
+  }
+
+  .panelHeader h1 {
+    font-size: clamp(30px, 7vw, 42px);
+  }
+
+  .proofStrip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .proofStrip strong {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 680px) {
+  .stage {
+    min-height: 100svh;
+  }
+
+  .videoBox {
+    height: 48svh;
+    min-height: 330px;
+  }
+
+  .ecosystem {
+    object-position: 31% top;
+  }
+
+  .hotspotFrame {
+    --px: 0.31;
+    --py: 0;
+  }
+
+  .vignette {
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.16) 38%, rgba(0, 0, 0, 0.88) 70%),
+      radial-gradient(circle at 32% 34%, transparent 0 18%, rgba(0, 0, 0, 0.52) 58%, rgba(0, 0, 0, 0.9) 100%);
+  }
+
+  .panel {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    max-height: 66svh;
+    padding: 18px;
+    border-color: rgba(133, 184, 255, 0.42);
+    backdrop-filter: blur(18px) saturate(1.18);
+    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+  }
+
+  .panelFrame {
+    inset: 6px;
+    clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 28px 100%, 0 calc(100% - 28px));
+  }
+
+  .panelFrame::after {
+    display: none;
+  }
+
+  .kicker {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+  }
+
+  .panelHeader h1 {
+    font-size: clamp(27px, 8.6vw, 36px);
+    line-height: 1;
+  }
+
+  .close {
+    flex-basis: 38px;
+    height: 38px;
+  }
+
+  .titleCluster {
+    grid-template-columns: 1fr;
+  }
+
+  .productBadge {
+    width: 54px;
+  }
+
+  .coreBrief {
+    margin-top: 16px;
+    padding: 13px 14px;
+  }
+
+  .coreBrief p {
+    font-size: 14px;
+  }
+
+  .proofStrip {
+    grid-template-columns: 1fr;
+    margin-top: 14px;
+  }
+
+  .proofStrip div {
+    padding: 12px 13px;
+  }
+
+  .capabilityGrid article {
+    min-height: auto;
+    padding: 14px;
+  }
+
+  .capabilityGrid h2,
+  .signalPanel h2 {
+    font-size: 17px;
+  }
+
+  .signalRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+    align-items: start;
+  }
+
+  .panelFooter span {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+  }
+}
+
+@media (max-width: 420px) {
+  .videoBox {
+    min-height: 300px;
+  }
+
+  .ecosystem {
+    object-position: 29% top;
+  }
+
+  .hotspotFrame {
+    --px: 0.29;
+    --py: 0;
+  }
+
+  .panel {
+    max-height: 68svh;
+    padding: 16px;
+  }
+
+  .panelHeader h1 {
+    font-size: clamp(25px, 8.2vw, 32px);
+  }
+
+  .coreBrief p,
+  .capabilityGrid p,
+  .signalRow strong {
+    font-size: 13px;
+  }
+}
+
+/* ── LIVE-SITE GEOMETRY OVERRIDE ──────────────────────────────────────────
+   Appended deliberately AFTER the breakpoint blocks above so it wins at every
+   width without editing them.
+
+   The /connect-hud prototype crops the ecosystem into a band on small screens
+   and biases object-position to keep the Pro side clear of the panel. The real
+   section does neither: the idle video fills the sticky stage at every size
+   with a plain centred object-fit: cover. Inheriting the prototype's crops here
+   would map every node target to a frame that isn't on screen.
+
+   .videoBox carries no video in this component — it exists only as a size
+   container whose box mirrors the idle video's, so node percentages resolve
+   against the VIDEO FRAME rather than the page. */
+.videoBox {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  container-type: size;
+  pointer-events: none;
+}
+
+.hotspotFrame {
+  --px: 0.5;
+  --py: 0.5;
+}
+
+
+/* ── THE PANEL IS ALWAYS CENTRED, AND ALWAYS CLEARS THE NAV ───────────────
+   Appended last so it beats every breakpoint block above at every width.
+
+   Two things were wrong. The panel was centred against the FULL viewport, so
+   the fixed nav pill sat on top of its first 63px — the suite kicker was
+   completely hidden and the headline clipped. And the fix for that was scoped
+   to desktop only, which left small screens bottom-anchored rather than
+   centred.
+
+   One rule for all widths: centre the panel in the space BELOW the nav, and
+   take exactly that much off its height so it can never spill past the bottom.
+   Height is capped by the viewport, so the panel always fits and always
+   scrolls internally instead of overflowing the screen. */
+.panel {
+  /* The nav pill's actual bottom edge, and one equal gutter on every side, so
+     the panel is optically centred in the space it is allowed to occupy rather
+     than merely fitted into it. */
+  --nav-bottom: calc(var(--nav-top, 24px) + 64px);
+  --gutter: clamp(10px, 2vw, 24px);
+  top: calc(var(--nav-bottom) + var(--gutter) + (100svh - var(--nav-bottom) - var(--gutter) * 2) / 2);
+  bottom: auto;
+  max-height: calc(100svh - var(--nav-bottom) - var(--gutter) * 2);
+  /* Horizontally centred too. `right` has to be explicitly cleared: the
+     narrower breakpoints above still set it, and a stray `right` alongside
+     `left: 50%` pins the panel back against the edge. */
+  left: 50%;
+  right: auto;
+  transform: translate3d(-50%, calc(-50% + 14px), 0) rotateX(2deg) scale(0.96);
+  transform-origin: center center;
+}
+
+.panelOpen {
+  transform: translate3d(-50%, -50%, 0) rotateX(0) scale(1);
+}
+
+/* Below the desktop breakpoint the panel spans the screen width rather than
+   sitting in a right-hand column — there is no room for a side-by-side read. */
+@media (max-width: 920px) {
+  .panel {
+    left: var(--gutter);
+    right: var(--gutter);
+    width: auto;
+    /* Edge-to-edge here, so it is already centred by its own gutters — the
+       -50% X shift would drag it off the left of the screen. */
+    transform: translate3d(0, calc(-50% + 14px), 0) rotateX(2deg) scale(0.96);
+  }
+
+  .panelOpen {
+    transform: translate3d(0, -50%, 0) rotateX(0) scale(1);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SUITE TITLES + NODE NAMES
+   ═══════════════════════════════════════════════════════════════════════════
+   Type over a hologram is the easiest way to ruin a hologram, so everything
+   here is built to stay subordinate to the render: hairline weight, wide
+   tracking, no solid fills, and nothing that competes with the nodes' own
+   light. Colour is Brand Guide V4 — Supernova #5270FF for Pro, Aurora #863399
+   for One — lifted toward Light for the glow tiers rather than invented.
+
+   NOTHING APPEARS UNTIL THE HOLOGRAM IS IDLE. Everything keys off [data-on],
+   which follows the section's `active` state, so no label is ever on screen
+   during the activation build — the structure assembles first, then it gets
+   named. */
+
+.suiteZone {
+  position: absolute;
+  inset: 0;
+  z-index: 4;            /* under .hotspotLayer (5) so nodes keep their clicks */
+}
+
+/* ── SUITE TITLES ──────────────────────────────────────────────────────── */
+.suiteTitles {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.suiteTitle {
+  position: absolute;
+  top: clamp(72px, 13vh, 132px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.16em;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  text-transform: uppercase;
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity .5s ease, transform .5s ease, filter .5s ease;
+}
+.suiteTitle i {
+  font-style: normal;
+  font-size: clamp(9px, 0.72vw, 12px);
+  font-weight: 600;
+  letter-spacing: .52em;
+  text-indent: .52em;      /* letter-spacing adds a trailing gap; this re-centres */
+  opacity: .62;
+}
+.suiteTitle b {
+  font-weight: 600;
+  font-size: clamp(20px, 2.05vw, 38px);
+  letter-spacing: .3em;
+  text-indent: .3em;
+  line-height: 1;
+}
+.suiteTitlePro { left: clamp(20px, 7vw, 130px); }
+.suiteTitleOne { right: clamp(20px, 7vw, 130px); }
+
+/* the reveal — only once the hologram has settled */
+/* `backwards`, NOT `both`, and it matters. `both` holds the final keyframe
+   forever, which outranks ordinary declarations — so the hover dim/lit rules
+   below silently did nothing and every title stayed at full strength.
+   `backwards` applies the FROM value before the animation starts and then hands
+   the element back to normal CSS once it finishes, which is what lets the
+   hover states actually take effect. */
+.suiteTitles[data-on="true"] .suiteTitle {
+  opacity: 1;
+  transform: translateY(0);
+  animation: suiteTitleIgnite 1.1s cubic-bezier(.16,.84,.44,1) backwards;
+}
+.suiteTitles[data-on="true"] .suiteTitleOne { animation-delay: .12s; }
+
+@keyframes suiteTitleIgnite {
+  0%   { opacity: 0; transform: translateY(16px); letter-spacing: .62em; filter: blur(6px); }
+  55%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+
+/* AT REST THEY MUST ALREADY READ. These sat too dark against a hologram this
+   bright — the names are the section's labelling, not a hover-only affordance,
+   so they start legible and hover only adds. */
+.suiteTitlePro {
+  color: #f2f6ff;
+  text-shadow: 0 0 14px rgba(82,112,255,.85), 0 0 40px rgba(82,112,255,.5), 0 2px 18px rgba(0,0,0,.75);
+}
+.suiteTitleOne {
+  color: #fbf2ff;
+  text-shadow: 0 0 14px rgba(134,51,153,.9), 0 0 40px rgba(134,51,153,.55), 0 2px 18px rgba(0,0,0,.75);
+}
+.suiteTitle i { opacity: .78; }
+
+/* hovering a half lights its title and lets the other recede */
+/* These carry the `.suiteTitles[data-on="true"]` prefix on purpose. Without it
+   they lose to the reveal rule above on specificity (0-3-0 beats 0-2-0), which
+   is why the dim state measured at full opacity even after the fill-mode was
+   fixed — two different mechanisms, same symptom, and the second only surfaced
+   once the first was out of the way. */
+/* HOVER ILLUMINATES AND POPS — a little, not a lot. */
+.suiteTitles[data-on="true"] .suiteTitlePro[data-state="lit"] {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255,255,255,.9), 0 0 26px rgba(140,170,255,1), 0 0 68px rgba(82,112,255,.85), 0 0 120px rgba(82,112,255,.5);
+  transform: translateY(-3px) scale(1.045);
+}
+.suiteTitles[data-on="true"] .suiteTitleOne[data-state="lit"] {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(255,255,255,.9), 0 0 26px rgba(206,140,226,1), 0 0 68px rgba(134,51,153,.9), 0 0 120px rgba(134,51,153,.55);
+  transform: translateY(-3px) scale(1.045);
+}
+.suiteTitles[data-on="true"] .suiteTitle[data-state="lit"] i { opacity: 1; }
+/* The other suite RECEDES, it does not disappear. .32 read as switched off. */
+.suiteTitles[data-on="true"] .suiteTitle[data-state="dim"] {
+  opacity: .62;
+  filter: saturate(.72);
+}
+
+/* ── NODE NAMES ────────────────────────────────────────────────────────── */
+.nodeLabel {
+  position: absolute;
+  /* lifted clear of the node symbol already drawn into the approved render —
+     the hit area is clamp(76px,6.2vw,118px) wide, so this clears its radius */
+  translate: -50% calc(-50% - clamp(44px, 3.5vw, 66px));
+  white-space: nowrap;
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: clamp(8.5px, 0.66vw, 11.5px);
+  font-weight: 600;
+  letter-spacing: .24em;
+  text-indent: .24em;
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .4s ease, color .4s ease, text-shadow .4s ease, translate .4s ease;
+}
+.nodeLabel[data-accent="blue"]   { color: #cfdcff; text-shadow: 0 0 12px rgba(82,112,255,.8), 0 0 30px rgba(82,112,255,.35); }
+.nodeLabel[data-accent="violet"] { color: #e9d5f7; text-shadow: 0 0 12px rgba(134,51,153,.85), 0 0 30px rgba(134,51,153,.4); }
+
+.nodeLabel[data-on="true"] {
+  opacity: .82;
+  animation: nodeLabelIn .55s cubic-bezier(.16,.84,.44,1) backwards;
+}
+@keyframes nodeLabelIn {
+  0%   { opacity: 0; filter: blur(4px); }
+  100% { opacity: .82; filter: blur(0); }
+}
+
+.nodeLabel[data-on="true"][data-state="lit"] {
+  opacity: 1;
+  color: #ffffff;
+  translate: -50% calc(-50% - clamp(48px, 3.8vw, 72px));
+}
+.nodeLabel[data-accent="blue"][data-state="lit"]   { text-shadow: 0 0 9px rgba(198,216,255,1), 0 0 28px rgba(82,112,255,1); }
+.nodeLabel[data-accent="violet"][data-state="lit"] { text-shadow: 0 0 9px rgba(226,205,240,1), 0 0 28px rgba(134,51,153,1); }
+.nodeLabel[data-on="true"][data-state="dim"] { opacity: .26; }
+
+/* Phones: the hologram is small and eleven names would bury it. The suite
+   titles carry the structure; individual names arrive on tap via the brief. */
+@media (max-width: 767px) {
+  .nodeLabel { display: none; }
+  .suiteTitle b { font-size: clamp(16px, 5vw, 22px); letter-spacing: .22em; text-indent: .22em; }
+  .suiteTitle { top: clamp(58px, 10vh, 96px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .suiteTitles[data-on="true"] .suiteTitle,
+  .nodeLabel[data-on="true"] { animation: none !important; filter: none !important; }
+  .nodeLabel[data-on="true"] { opacity: .82; }
+}

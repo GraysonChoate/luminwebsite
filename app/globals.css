@@ -47,6 +47,7 @@ body {
 .font-nav { font-family: var(--font-montserrat), sans-serif; }
 
 .container-pad { padding-inline: var(--container-pad); }
+.nav-pill-shell { width: calc(100% - 2 * var(--container-pad)); }
 
 /* display type scale (fluid, vw-derived like the reference architecture) */
 .type-statement { font-size: clamp(34px, 4.86vw, 84px); line-height: 1.0; letter-spacing: -0.045em; font-weight: 500; }
@@ -227,8 +228,51 @@ body {
    a hairline rule, a small system tag over the product name. Reads as
    instrumentation in the scene rather than a web button on top of it. */
 @keyframes heroCueIn   { from { opacity: 0 } to { opacity: 1 } }
-@keyframes heroCueDraw { from { stroke-dashoffset: 260 } to { stroke-dashoffset: 0 } }
+@keyframes heroCueDraw { from { stroke-dashoffset: 1 } to { stroke-dashoffset: 0 } }
 @keyframes heroCuePulse{ 0%,100% { opacity:.55; r:3 } 50% { opacity:1; r:4.6 } }
+@keyframes heroCueSpark {
+  from { stroke-dashoffset: 1; opacity: 0; }
+  18%  { opacity: 1; }
+  to   { stroke-dashoffset: 0; opacity: 0; }
+}
+@keyframes heroHudScan {
+  from { transform: translateX(-135%) skewX(-12deg); opacity: 0; }
+  18%  { opacity: .5; }
+  58%  { opacity: .18; }
+  to   { transform: translateX(135%) skewX(-12deg); opacity: 0; }
+}
+@keyframes heroHudHold {
+  0%, 100% { opacity: .72; filter: drop-shadow(0 0 5px rgba(82,112,255,.72)); }
+  48%      { opacity: 1;   filter: drop-shadow(0 0 10px rgba(125,200,255,.92)); }
+  52%      { opacity: .82; filter: drop-shadow(0 0 7px rgba(82,112,255,.78)); }
+}
+
+@keyframes heroHudHoverPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(150,215,255,.62),
+      0 22px 62px -18px rgba(0,0,0,.94),
+      0 0 48px -10px rgba(82,112,255,.72),
+      0 0 86px -26px rgba(125,205,255,.42),
+      inset 0 1px 0 rgba(225,242,255,.25),
+      inset 0 -1px 0 rgba(82,112,255,.22);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(215,242,255,.9),
+      0 22px 62px -18px rgba(0,0,0,.94),
+      0 0 62px -7px rgba(82,112,255,.96),
+      0 0 118px -20px rgba(125,205,255,.62),
+      inset 0 1px 0 rgba(245,252,255,.38),
+      inset 0 -1px 0 rgba(125,205,255,.36);
+  }
+}
+@keyframes heroMediaSheen {
+  from { transform: translateX(-120%); opacity: 0; }
+  20%  { opacity: .42; }
+  70%  { opacity: .18; }
+  to   { transform: translateX(120%); opacity: 0; }
+}
 
 /* The elbow draws FIRST, out of the object, and the brief pops off the end of
    it — so the order on screen is: node lights, line runs, brief arrives. That
@@ -236,10 +280,33 @@ body {
    rather than fading in on top of the shot. Faster than it was, because it now
    only ever plays once we have come to a full stop; it no longer has to cover
    travel. */
-.hero-cue-line { stroke-dasharray: 260; animation: heroCueDraw .42s cubic-bezier(.16,.84,.44,1) both; }
+/* THE DASH PATTERN IS NORMALISED, NOT MEASURED IN PIXELS.
+   These were `stroke-dasharray: 260`, a hardcoded pixel length, and the draw
+   animation holds at `stroke-dashoffset: 0`. That makes the pattern 260 ON then
+   260 OFF, so any connector longer than 260px drew for 260px and then vanished
+   before it reached the card — a hairline pointing at nothing.
+   Measured at 1920x1080: six of the nine connectors exceeded it (Studio worst
+   at 614px, so 42% of the line was drawn and the rest was gap).
+   The polylines now carry `pathLength="1"`, which normalises their length to 1
+   whatever their real geometry, so a dasharray of 1 is exactly one line at
+   every stop and every viewport. */
+.hero-cue-line { stroke-dasharray: 1; animation: heroCueDraw .42s cubic-bezier(.16,.84,.44,1) both; }
+.hero-cue-line--spark {
+  stroke-dasharray: .085 .915;
+  animation: heroCueSpark .62s .08s cubic-bezier(.16,.84,.44,1) both;
+}
 .hero-cue-core { animation: heroCuePulse 2.6s ease-in-out infinite; }
 
+
+.hero-film-grade {
+  background:
+    radial-gradient(78% 70% at 50% 48%, transparent 35%, rgba(2,5,12,.18) 100%),
+    linear-gradient(180deg, rgba(5,7,13,.42) 0%, rgba(5,7,13,.12) 20%, rgba(5,7,13,.16) 58%, rgba(5,7,13,.56) 100%),
+    linear-gradient(90deg, rgba(0,0,0,.18), transparent 18%, transparent 82%, rgba(0,0,0,.18));
+}
+
 .hero-brief {
+  position: absolute;
   display: inline-flex; align-items: baseline; gap: .7em;
   padding: .92rem 1.5rem .92rem 1.6rem;
   animation: none;   /* replaced by the side-aware pop below */
@@ -266,6 +333,345 @@ body {
   text-shadow: 0 0 22px rgba(120,170,255,.7);
 }
 .hero-brief-go { font-size: 16px; color: rgba(175,210,255,.95); }
+
+.hero-brief--hud {
+  --hud-accent: 224,235,246;
+  --hud-accent-soft: 238,246,252;
+  --hud-text-soft: 225,236,246;
+  --hud-text-bright: 252,254,255;
+  --hud-border: 224,237,248;
+  position: absolute;
+  overflow: hidden;
+  width: min(410px, calc(100vw - 40px));
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 15px 16px 14px;
+  background:
+    radial-gradient(80% 130% at 82% 20%, rgba(248,252,255,.16), transparent 62%),
+    linear-gradient(90deg, rgba(232,242,250,.11), transparent 28%, transparent 72%, rgba(238,247,253,.1)),
+    linear-gradient(180deg, rgba(18,23,31,.76), rgba(8,12,18,.68));
+  border-color: rgba(232,243,252,.82);
+  clip-path: polygon(20px 0, 68% 0, calc(68% + 14px) 14px, 100% 14px, 100% calc(100% - 26px), calc(100% - 26px) 100%, 0 100%, 0 20px);
+  box-shadow:
+    0 0 0 1px rgba(244,249,253,.18),
+    0 20px 58px -18px rgba(0,0,0,.96),
+    0 0 42px -14px rgba(226,240,251,.72),
+    inset 0 1px 0 rgba(255,255,255,.28),
+    inset 0 -1px 0 rgba(220,235,246,.16);
+  transition: border-color .32s ease, background .32s ease, box-shadow .32s ease, color .32s ease;
+}
+/* ── SUITE COLOUR AT REST ─────────────────────────────────────────────────
+   Both of these used to carry the SAME neutral-white values, and the suite
+   colour only arrived on :hover. That is reversed now: the brief materialises
+   in its suite colour from the first frame, so the spatial map and the brief
+   read as one system — the map identifies the product, and the brief assembles
+   out of that same light.
+
+   Hues are Brand Guide V4 and are not invented: Supernova #5270FF = 82,112,255
+   and Aurora #863399 = 134,51,153. The `-soft` / `-bright` values are those two
+   blended toward Light #FFFFFF for the highlight tiers — pale blue-white on Pro,
+   lavender-white on One. Body text stays high-contrast so the colour lives in
+   the borders, glass and glow rather than in the words. */
+.hero-brief--hud[data-suite="pro"] {
+  --hud-accent: 82,112,255;         /* Supernova */
+  --hud-accent-soft: 130,158,255;
+  --hud-text-soft: 198,216,255;     /* pale blue-white */
+  --hud-text-bright: 244,249,255;
+  --hud-border: 96,132,255;
+}
+.hero-brief--hud[data-suite="one"] {
+  --hud-accent: 134,51,153;         /* Aurora */
+  --hud-accent-soft: 176,104,196;
+  --hud-text-soft: 226,205,240;     /* lavender-white */
+  --hud-text-bright: 252,246,255;
+  --hud-border: 158,74,178;
+}
+.hero-brief--hud::before,
+.hero-brief--hud::after {
+  content: "";
+  position: absolute;
+  left: 22px;
+  right: 18px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(var(--hud-text-soft),.82), rgba(var(--hud-accent),.42) 44%, transparent 72%, rgba(var(--hud-text-soft),.54));
+  filter: drop-shadow(0 0 7px rgba(var(--hud-accent),.86));
+  animation: heroHudHold 3.8s ease-in-out infinite;
+}
+.hero-brief--hud::before { top: 8px; right: 128px; }
+.hero-brief--hud::after { bottom: 8px; left: 18px; right: 28px; }
+.hero-brief--hud .hero-brief-topline,
+.hero-brief--hud .hero-brief-main,
+.hero-brief--hud .hero-brief-cta {
+  position: relative;
+  z-index: 1;
+}
+.hero-brief--hud:hover {
+  border-color: rgba(var(--hud-text-bright),.94);
+  transform: translateY(-50%);
+  box-shadow:
+    0 0 0 1px rgba(var(--hud-border),.62),
+    0 22px 62px -18px rgba(0,0,0,.94),
+    0 0 62px -8px rgba(var(--hud-accent),.96),
+    0 0 92px -30px rgba(var(--hud-accent-soft),.52),
+    inset 0 1px 0 rgba(225,242,255,.27),
+    inset 0 -1px 0 rgba(var(--hud-accent),.24);
+}
+.hero-brief--hud[style*="translateX(-100%)"]:hover {
+  transform: translateY(-50%) translateX(-100%);
+}
+.hero-brief--centered:hover {
+  transform: translate(-50%, -50%);
+}
+.hero-brief--hud[data-suite="pro"]:hover {
+  --hud-accent: 38,77,210;
+  --hud-accent-soft: 55,96,228;
+  --hud-text-soft: 190,215,255;
+  --hud-text-bright: 244,249,255;
+  --hud-border: 58,101,230;
+  background:
+    radial-gradient(80% 130% at 82% 20%, rgba(58,100,232,.32), transparent 62%),
+    linear-gradient(90deg, rgba(36,75,208,.24), transparent 28%, transparent 72%, rgba(51,91,220,.2)),
+    linear-gradient(180deg, rgba(7,18,57,.82), rgba(4,10,32,.75));
+  border-color: rgba(65,110,240,.96);
+}
+.hero-brief--hud[data-suite="one"]:hover {
+  --hud-accent: 112,40,145;
+  --hud-accent-soft: 139,52,174;
+  --hud-text-soft: 226,200,246;
+  --hud-text-bright: 253,246,255;
+  --hud-border: 151,65,186;
+  background:
+    radial-gradient(80% 130% at 82% 20%, rgba(145,56,180,.34), transparent 62%),
+    linear-gradient(90deg, rgba(105,36,142,.25), transparent 28%, transparent 72%, rgba(132,45,166,.22)),
+    linear-gradient(180deg, rgba(39,9,55,.84), rgba(19,5,30,.77));
+  border-color: rgba(164,76,199,.96);
+}
+.hero-brief--grouped {
+  gap: 9px;
+  min-height: 0;
+  padding: 12px 13px 11px;
+}
+.hero-brief--grouped:hover {
+  transform: translateY(-50%);
+}
+.hero-brief--grouped[data-layout="row"]:hover {
+  transform: none;
+}
+.hero-brief--grouped .hero-brief-main {
+  grid-template-columns: minmax(0, 1fr) clamp(68px, 22%, 88px);
+  gap: 9px;
+}
+.hero-brief--grouped .hero-brief-media {
+  min-height: 72px;
+  transform: none;
+}
+.hero-brief--grouped .hero-brief-name {
+  font-size: 20px;
+  letter-spacing: .11em;
+}
+.hero-brief--grouped .hero-brief-prop {
+  font-size: 11px;
+  line-height: 1.28;
+}
+.hero-brief--grouped .hero-brief-specs {
+  gap: 3px;
+}
+.hero-brief--grouped .hero-brief-specs span {
+  font-size: 8.6px;
+  letter-spacing: .075em;
+}
+.hero-brief--grouped .hero-brief-cta {
+  padding-top: 7px;
+  font-size: 9px;
+}
+.hero-brief-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+.hero-brief--hud .hero-brief-tag {
+  font-size: 9px;
+  letter-spacing: .28em;
+  color: rgba(var(--hud-text-soft),.76);
+}
+.hero-brief-rail {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  color: rgba(var(--hud-text-soft),.58);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.hero-brief-rail i {
+  width: 28px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(var(--hud-accent-soft),.34), rgba(var(--hud-text-bright),.9));
+  box-shadow: 0 0 10px rgba(var(--hud-accent),.78);
+}
+.hero-brief-rail strong {
+  color: rgba(var(--hud-text-bright),.96);
+  text-shadow: 0 0 14px rgba(var(--hud-accent),.75);
+}
+.hero-brief-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 124px;
+  gap: 18px;
+  align-items: stretch;
+}
+.hero-brief-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.hero-brief--hud .hero-brief-name {
+  font-size: 27px;
+  line-height: 1;
+  letter-spacing: .12em;
+  color: rgba(var(--hud-text-bright), .98);
+  text-shadow: 0 0 20px rgba(var(--hud-accent-soft), .6), 0 0 34px rgba(var(--hud-accent), .42);
+}
+.hero-brief-prop {
+  max-width: 21em;
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(var(--hud-text-bright),.9);
+  text-shadow: 0 1px 14px rgba(0,0,0,.78);
+}
+.hero-brief-specs {
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+}
+.hero-brief-specs span {
+  position: relative;
+  padding-left: 14px;
+  font-size: 10.5px;
+  line-height: 1.25;
+  letter-spacing: .08em;
+  color: rgba(var(--hud-text-bright),.9);
+  text-shadow: 0 0 12px rgba(var(--hud-accent),.38), 0 1px 10px rgba(0,0,0,.7);
+  text-transform: uppercase;
+}
+.hero-brief-specs span::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: .48em;
+  width: 6px;
+  height: 1px;
+  background: rgba(var(--hud-text-bright),.96);
+  box-shadow: 0 0 9px rgba(var(--hud-accent-soft),.92);
+}
+.hero-brief-media {
+  position: relative;
+  min-height: 132px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--hud-border),.58);
+  transform: translateY(-12px);
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 24px), calc(100% - 24px) 100%, 0 100%, 0 16px);
+  background:
+    radial-gradient(80% 70% at 50% 50%, rgba(var(--hud-accent),.46), rgba(var(--hud-accent),.16) 48%, transparent 78%),
+    rgba(2,8,20,.55);
+  background-size: 100% 100%, 100% 100%;
+  box-shadow:
+    inset 0 0 24px rgba(var(--hud-accent),.36),
+    inset 0 0 0 1px rgba(220,245,255,.08),
+    0 0 26px -9px rgba(var(--hud-accent-soft),.92);
+}
+.hero-brief-media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid rgba(220,244,255,.16);
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 24px), calc(100% - 24px) 100%, 0 100%, 0 16px);
+  box-shadow: inset 0 0 18px rgba(var(--hud-accent-soft),.22);
+}
+.hero-brief-media::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -35%;
+  width: 34%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(250,245,255,.18), rgba(var(--hud-accent),.1), transparent);
+  mix-blend-mode: screen;
+  animation: heroMediaSheen 4.5s 1.4s ease-in-out infinite;
+}
+.hero-brief-media-core {
+  display: none;
+}
+.hero-brief--hud:hover .hero-brief-media {
+  border-color: rgba(var(--hud-text-bright),.86);
+  box-shadow:
+    inset 0 0 28px rgba(var(--hud-accent),.36),
+    inset 0 0 0 1px rgba(240,250,255,.16),
+    0 0 34px -6px rgba(var(--hud-accent-soft),1);
+}
+.hero-brief--hud:hover .hero-brief-specs span {
+  color: rgba(240,248,255,.96);
+}
+.hero-brief-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid rgba(var(--hud-border),.26);
+  padding-top: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  color: rgba(var(--hud-text-bright),.9);
+  text-transform: uppercase;
+}
+.hero-brief-cta span {
+  font-size: 16px;
+  line-height: 1;
+  color: rgba(var(--hud-text-soft),.96);
+}
+
+@media (max-width: 640px) {
+  .hero-brief--hud {
+    width: min(88vw, 360px);
+    padding: 13px 14px;
+    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 16px);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    backface-visibility: hidden;
+    will-change: transform, opacity;
+  }
+  .hero-brief-main {
+    grid-template-columns: 1fr;
+  }
+  .hero-brief-media {
+    min-height: 96px;
+    transform: none;
+  }
+  .hero-brief--hud .hero-brief-name {
+    font-size: 22px;
+  }
+  .hero-brief-topline {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .hero-brief--grouped .hero-brief-main {
+    grid-template-columns: minmax(0, 1fr) 76px;
+  }
+  .hero-brief--grouped .hero-brief-media {
+    min-height: 74px;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .hero-cue-line, .hero-brief, .hero-cue-core { animation: none !important; }
@@ -497,6 +903,17 @@ body {
   transform-origin: right center;
   animation: heroBriefPopL .36s .3s cubic-bezier(.2,1.25,.4,1) both;
 }
+.hero-brief--grouped[data-layout="row"] {
+  transform-origin: left top;
+  animation: heroBriefGroupPop .32s .24s cubic-bezier(.2,1.1,.4,1) both;
+}
+.hero-brief--grouped[data-layout="stack"] {
+  animation: heroBriefPopR .36s .3s cubic-bezier(.2,1.25,.4,1) both;
+}
+.hero-brief--centered {
+  transform-origin: center;
+  animation: heroBriefPopCenter .36s .3s cubic-bezier(.2,1.25,.4,1) both;
+}
 @keyframes heroBriefPopR {
   from { opacity: 0; transform: translateY(-50%) translateX(-16px) scale(.84); }
   to   { opacity: 1; transform: translateY(-50%) translateX(0)     scale(1);   }
@@ -504,6 +921,14 @@ body {
 @keyframes heroBriefPopL {
   from { opacity: 0; transform: translateY(-50%) translateX(-100%) translateX(16px) scale(.84); }
   to   { opacity: 1; transform: translateY(-50%) translateX(-100%) translateX(0)    scale(1);   }
+}
+@keyframes heroBriefPopCenter {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(.84); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes heroBriefGroupPop {
+  from { opacity: 0; transform: translateX(-10px) scale(.92); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 /* ── SCROLL TO CONTINUE ───────────────────────────────────────────────────
@@ -537,4 +962,180 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .hero-brief[data-side="r"], .hero-brief[data-side="l"] { animation-duration: .01s; }
   .hero-continue-chev { animation: none; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOLOGRAPHIC MATERIALIZATION — how a product brief arrives
+   ═══════════════════════════════════════════════════════════════════════════
+   A card that fades in reads as UI pasted over the film. This assembles like a
+   projected instrument, in a fixed order, and the order is the whole effect:
+
+     0.00s  LOCK-ON            a reticle closes onto the object in the scene
+     0.14s  SEGMENTED ASSEMBLY four corner brackets snap in, one after another
+     0.34s  EDGE-LIT           the frame's border ignites in the suite colour
+     0.42s  GLASS RESOLVES     the transparent interior fills between the edges
+     0.52s  SCANLINE           a luminous sweep runs down the panel
+     0.58s  CONTENT            copy lands just behind the scan, layer by layer
+     0.66s  CONNECTOR          the stem finally draws from node to panel
+
+   RESTRAINED PARALLAX: the layers do not arrive on one plane. Corners come
+   forward, glass expands from its centre, and the copy rises 8px out of a
+   slight blur — so the panel has depth without anything sliding around.
+
+   ── ONE HARD RULE FOR ANYONE EDITING THIS ────────────────────────────────
+   NEVER animate `transform` on `.hero-brief` itself. Its position is set by an
+   inline transform (`translate(-50%,-50%)` centred, `translateY(-50%)` stacked)
+   and a keyframe touching transform would override that and throw the brief
+   across the screen. Depth belongs to the CHILD layers, which own no layout. */
+
+/* 1 · LOCK-ON — target acquisition on the object itself */
+@keyframes heroLockRing {
+  0%   { r: 16; opacity: 0; stroke-width: 2.6; }
+  30%  { opacity: 1; }
+  100% { r: 4.5; opacity: 1; stroke-width: 1.4; }
+}
+.hero-cue-ring { animation: heroLockRing .32s cubic-bezier(.16,.84,.44,1) both; }
+
+/* 2 · SEGMENTED ASSEMBLY — the frame builds corner by corner.
+      Inset 14px on purpose: the panel's clip-path bevels the top-left and
+      bottom-right by 20px and 26px, so brackets any closer to the corner get
+      clipped away entirely. */
+.hero-brief-chrome { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.hero-brief-chrome i {
+  position: absolute; width: 13px; height: 13px;
+  border: 0 solid rgba(var(--hud-border), .96);
+  filter: drop-shadow(0 0 6px rgba(var(--hud-accent), .9));
+  animation: heroCornerIn .24s cubic-bezier(.16,.84,.44,1) both;
+}
+@keyframes heroCornerIn {
+  0%   { opacity: 0; transform: scale(.35); }
+  70%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1); }
+}
+.hero-brief-chrome i:nth-child(1) { top: 14px; left: 14px;   border-top-width: 1.5px; border-left-width: 1.5px;  animation-delay: .14s; }
+.hero-brief-chrome i:nth-child(2) { top: 18px; right: 14px;  border-top-width: 1.5px; border-right-width: 1.5px; animation-delay: .20s; }
+.hero-brief-chrome i:nth-child(3) { bottom: 14px; right: 14px; border-bottom-width: 1.5px; border-right-width: 1.5px; animation-delay: .26s; }
+.hero-brief-chrome i:nth-child(4) { bottom: 14px; left: 14px;  border-bottom-width: 1.5px; border-left-width: 1.5px;  animation-delay: .32s; }
+
+/* 3 · EDGE-LIT EXTRUSION — the border ignites before there is any interior */
+@keyframes heroEdgeIgnite {
+  0%   { opacity: 0; border-color: rgba(var(--hud-border), 0); }
+  22%  { opacity: 1; border-color: rgba(var(--hud-border), 0); }
+  55%  { border-color: rgba(var(--hud-border), 1); }
+  100% { opacity: 1; border-color: rgba(var(--hud-border), .86); }
+}
+.hero-brief--hud { animation: heroEdgeIgnite .52s cubic-bezier(.16,.84,.44,1) both; }
+
+/* 4 · GLASS RESOLVES — the transparent interior fills between the lit edges.
+      The panel's own background is handed to this layer so it can arrive on its
+      own clock; the parent keeps the border, clip-path and shadow. */
+.hero-brief--hud { background-image: none; background-color: transparent; }
+.hero-brief-glass {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  transform-origin: center;
+  animation: heroGlassIn .3s .42s cubic-bezier(.16,.84,.44,1) both;
+}
+@keyframes heroGlassIn {
+  0%   { opacity: 0; transform: scaleY(.55); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+.hero-brief--hud[data-suite="pro"] .hero-brief-glass {
+  background:
+    radial-gradient(80% 130% at 82% 20%, rgba(82,112,255,.26), transparent 62%),
+    linear-gradient(90deg, rgba(82,112,255,.15), transparent 28%, transparent 72%, rgba(82,112,255,.13)),
+    linear-gradient(180deg, rgba(6,12,34,.80), rgba(3,7,22,.72));
+}
+.hero-brief--hud[data-suite="one"] .hero-brief-glass {
+  background:
+    radial-gradient(80% 130% at 82% 20%, rgba(134,51,153,.28), transparent 62%),
+    linear-gradient(90deg, rgba(134,51,153,.16), transparent 28%, transparent 72%, rgba(134,51,153,.14)),
+    linear-gradient(180deg, rgba(20,8,26,.80), rgba(12,5,18,.72));
+}
+
+/* 5 · SCANLINE REVEAL — a luminous sweep down the panel, in the suite colour */
+.hero-brief-scan {
+  position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  z-index: 4; pointer-events: none;
+  background: linear-gradient(90deg,
+    transparent,
+    rgba(var(--hud-text-soft), .9) 16%,
+    rgba(var(--hud-accent-soft), 1) 50%,
+    rgba(var(--hud-text-soft), .9) 84%,
+    transparent);
+  filter: drop-shadow(0 0 10px rgba(var(--hud-accent), 1));
+  animation: heroScanSweep .58s .52s cubic-bezier(.36,0,.5,1) both;
+}
+@keyframes heroScanSweep {
+  0%   { top: 0;    opacity: 0; }
+  14%  { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* 6 · CONTENT — lands just behind the scan, layer by layer (the parallax) */
+@keyframes heroBriefContentIn {
+  0%   { opacity: 0; transform: translate3d(0, 9px, 0); filter: blur(2.5px); }
+  100% { opacity: 1; transform: none; filter: blur(0); }
+}
+.hero-brief--hud .hero-brief-topline { animation: heroBriefContentIn .34s .58s cubic-bezier(.16,.84,.44,1) both; }
+.hero-brief--hud .hero-brief-main    { animation: heroBriefContentIn .34s .66s cubic-bezier(.16,.84,.44,1) both; }
+.hero-brief--hud .hero-brief-cta     { animation: heroBriefContentIn .34s .76s cubic-bezier(.16,.84,.44,1) both; }
+
+/* 7 · CONNECTOR LAST — the stem only draws once there is a panel to dock into.
+      Delayed to .66s; it used to fire immediately, which read as the line
+      arriving before the thing it connects to. */
+.hero-cue-line { animation-delay: .66s; }
+.hero-cue-line--spark { animation-delay: .74s; }
+
+/* The suite colour now belongs to the connector too, so the stem, the node and
+   the panel are unmistakably one system. */
+
+/* REDUCED MOTION — everything resolves, nothing travels. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-brief-chrome i, .hero-brief-glass, .hero-brief-scan,
+  .hero-brief--hud, .hero-brief--hud .hero-brief-topline,
+  .hero-brief--hud .hero-brief-main, .hero-brief--hud .hero-brief-cta,
+  .hero-cue-ring {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+  .hero-brief-scan { display: none !important; }
+}
+
+/* ── FIXES FOUND BY INSPECTING THE LIVE BUILD ORDER ───────────────────────
+   Two things were wrong on the first pass and only showed up by enumerating
+   getAnimations() on a mounted brief — they were invisible in a screenshot.
+
+   1. THE BORDER WAS STILL NEUTRAL WHITE. `.hero-brief--hud` hardcodes
+      `border-color: rgba(232,243,252,.82)` rather than reading `--hud-border`,
+      so setting the suite variables coloured the glass and the glow but left a
+      white frame around it. The border is the most legible part of the suite
+      read, so this mattered more than anything else on the panel.
+
+   2. THE EDGE-IGNITE NEVER RAN. Each layout variant carries its own entrance
+      (`heroBriefPopR` / `heroBriefGroupPop` / …) and those win, because they
+      exist for a real reason: the brief's POSITION is an inline transform, so
+      any entrance has to restate it in every keyframe or the panel jumps across
+      the screen. A pop that slides and scales the whole card also fights the
+      brief here — the panel should assemble, not fly in. So for HUD briefs the
+      pop is replaced outright by the ignite, which touches only opacity and
+      border-color and therefore needs no transform at all. */
+.hero-brief--hud {
+  border-color: rgba(var(--hud-border), .86);
+  box-shadow:
+    0 0 0 1px rgba(var(--hud-border), .22),
+    0 20px 58px -18px rgba(0,0,0,.96),
+    0 0 46px -14px rgba(var(--hud-accent), .55),
+    inset 0 1px 0 rgba(var(--hud-text-soft), .20),
+    inset 0 -1px 0 rgba(var(--hud-accent), .18);
+}
+.hero-brief--hud[data-side="r"],
+.hero-brief--hud[data-side="l"],
+.hero-brief--hud[data-side="center"],
+.hero-brief--hud.hero-brief--centered,
+.hero-brief--hud.hero-brief--grouped[data-layout="row"],
+.hero-brief--hud.hero-brief--grouped[data-layout="stack"] {
+  animation: heroEdgeIgnite .52s cubic-bezier(.16,.84,.44,1) both;
 }

@@ -5,6 +5,7 @@ import { gsap, ScrollTrigger } from "@/lib/motion";
 import { getLenis } from "@/components/SmoothScroll";
 import { createScrubCatch } from "@/lib/beatGate";
 import FrameScrubber from "@/components/ui/FrameScrubber";
+import EcosystemNodeHud from "@/components/eco/EcosystemNodeHud";
 
 /**
  * Product Ecosystem — the hero's continuation, not a new place.
@@ -63,14 +64,40 @@ import FrameScrubber from "@/components/ui/FrameScrubber";
  * breaks it, and a hard ceiling guarantees it cannot outlive the clip.
  */
 
-const DESCENT_FRAMES = 144;
+/**
+ * 145, and the frames themselves are now sliced from the canonical approved
+ * clip `11-orb-descend-to-ecosystem.mp4`.
+ *
+ * ── WHY THE PICTURES CHANGED AND THE ARCHITECTURE DID NOT ────────────────
+ * The approved hero film ends on `10-one-mrkt-to-orb-descend.mp4`, and that
+ * clip's last frame lands on what used to be frame 83 of this strip — measured,
+ * not assumed. The old strip's first 82 frames (the orb as a distant point,
+ * falling toward the floor) are now the hero's job, and clip 11 is the SAME
+ * footage from f_083 onward, retimed 2.33x slower to fill this same 6.0417s
+ * slot. Leaving the old strip in place would have snapped the orb backwards
+ * from mid-descent to a distant point at the handoff.
+ *
+ * So only the images were replaced. The unified descent+activation scrub, the
+ * gate, the reverse-out and every scroll constant below are untouched; this
+ * count moving by one shifts GATE_AT by ~0.2%, which is below a frame.
+ * Previous strip: `media-masters/descent-pre-clip11-backup/`.
+ */
+const DESCENT_FRAMES = 145;
 const ACTIVATION_FRAMES = 145;
 const TOTAL_FRAMES = DESCENT_FRAMES + ACTIVATION_FRAMES; // 289
 const LAST = TOTAL_FRAMES - 1;
 
+/** ── THE OLD FLOATING-DISC HUB IS GONE ────────────────────────────────────
+ *  `activation-v2` is the rebuilt boot-up that lands on the v5 symbol master's
+ *  frame 1. It replaces the old activation outright rather than sitting behind
+ *  a flag: a flag meant the server-rendered markup still carried the old hub's
+ *  <video> sources and poster, so the old ecosystem flashed on screen for the
+ *  moment before hydration swapped them. There is no old version to fall back
+ *  to here any more, which is the only way that flash cannot happen.
+ *  Still 145 frames, so every scroll constant above holds unchanged. */
 const chainUrls = [
   ...Array.from({ length: DESCENT_FRAMES }, (_, i) => `/frames/descent/f_${String(i + 1).padStart(3, "0")}.webp`),
-  ...Array.from({ length: ACTIVATION_FRAMES }, (_, i) => `/frames/activation/f_${String(i + 1).padStart(3, "0")}.webp`),
+  ...Array.from({ length: ACTIVATION_FRAMES }, (_, i) => `/frames/activation-v2/f_${String(i + 1).padStart(3, "0")}.webp`),
 ];
 
 /** section progress at which the frame strip is exhausted; the rest is dwell.
@@ -88,6 +115,11 @@ const BAND_END = 301 / 326; // ≈ 0.9233 of a 326vh pinned span
 const GATE_AT = ((DESCENT_FRAMES - 1) / LAST) * BAND_END; // ≈ 0.3736
 /** the activation's authored length — the gated scroll takes exactly this long */
 const ACTIVATION_S = 6.0417;
+/** "Go back" scrubs those same 145 frames in reverse. Faster than the forward
+ *  play — powering down should feel decisive, and re-watching a 6s boot-up
+ *  backwards drags. Raise toward ACTIVATION_S for a slower retreat, drop toward
+ *  2s for a snap. This one number is the whole feel of the back button. */
+const REVERSE_S = 3.4;
 /** scroll span over which the living hub dissolves in/out of the last frame */
 const IDLE_FADE = 15 / 326; // ≈ 15vh — a dissolve in both directions
 /** post-activation hold so the release doesn't feel abrupt */
@@ -95,8 +127,15 @@ const HOLD_MS = 700;
 /** the descent's authored length — 144 frames at 24fps */
 const DESCENT_S = 6.0417;
 /** how long "Product Suites" sits on the plate before the hub takes over */
-/** The descent in two gestures: start, halfway, orb at rest. */
-const DESCENT_STEPS = [0, 0.5, 1].map((f) => f * GATE_AT);
+/** ── THE DESCENT PLAYS ITSELF ─────────────────────────────────────────────
+ *  It used to advance in three steps, one per wheel flick. Scroll was already
+ *  refused for scrolling here — the wheel was only ever being read as a
+ *  trigger — which made this the one place where a gesture still decided
+ *  something. From the moment the section takes the screen, nothing but the
+ *  buttons decides anything: the descent runs at its authored pace, then
+ *  "Activate ecosystem" waits, then the gated activation, then the lit hub and
+ *  its two controls. `DESCENT_STEPS`, `stepDescent` and the gesture arm/re-arm
+ *  timing are gone; the descent now uses the same timed tween as `fireGate`. */
 /** the void's mapping transition occupies its first 134 of 585 frames */
 const VOID_MAPPING_END = 134 / 585;
 /** the eco→void transition's authored length, played not scrubbed */
@@ -128,6 +167,7 @@ export default function EcosystemSequence() {
   const idleBRef = useRef<HTMLVideoElement>(null);
   const idleLayerRef = useRef<HTMLDivElement>(null);
 
+
   /** the activation has been played once — never replays, never re-locks */
   const activatedRef = useRef(false);
   const lockedRef = useRef(false);
@@ -139,13 +179,18 @@ export default function EcosystemSequence() {
 
   const [cueOn, setCueOn] = useState(false);
   const [suitesOn, setSuitesOn] = useState(false);
+  /** Arriving at /#ecosystem is a real page load, so the film's opening paints
+   *  before the jump can measure and land. This covers that beat. */
+  const [deepLinkCover, setDeepLinkCover] = useState(false);
   const navRef = useRef<{ goForward: () => void; goBack: () => void; activate: () => void } | null>(null);
   /** the section currently owns the screen and all input */
   const heldRef = useRef(false);
   /** a descent step is mid-flight */
   const travellingRef = useRef(false);
-  /** which descent step we are parked on */
-  const stepRef = useRef(0);
+  /** the descent has finished playing at least once. Re-entering the section
+   *  then lands straight on the orb-at-rest frame with the button waiting,
+   *  rather than replaying six seconds of falling every single time. */
+  const descentDoneRef = useRef(false);
   /** a button is taking us out — do not re-seize on the way */
   const exitingRef = useRef(false);
 
@@ -156,6 +201,7 @@ export default function EcosystemSequence() {
     let ceilingTimer: number | undefined;
     let cueTimer: number | undefined;
     let gateTween: gsap.core.Tween | null = null;
+    let descentTween: gsap.core.Tween | null = null;
     let descentGate: ReturnType<typeof createScrubCatch> | null = null;
     let handoff: number | undefined;
     let pinnedTo = 0;
@@ -173,33 +219,77 @@ export default function EcosystemSequence() {
       setSuitesOn(on);
     };
 
-    const blockWheel = (ev: Event) => ev.preventDefault();
+    /** The lit hub owns the page, so wheel and touch are refused outright —
+     *  except inside an open product HUD, which scrolls itself. Without this
+     *  exemption the dossier is stuck on its first screen: preventDefault kills
+     *  the wheel before the panel's own overflow ever sees it. */
+    /* ── THE WAY OUT, UPWARDS ─────────────────────────────────────────────
+       "Go back" reversed the activation and then left the visitor sealed in.
+       It powered the hub down to the orb-at-rest gate — correctly — but the
+       section was still HELD, so every wheel event was preventDefaulted and
+       holdScroll snapped the page back to `pinnedTo`. Measured: 100 upward
+       wheel events moved the page 0px. The control said "Go back" and then
+       refused to let anyone go anywhere.
+
+       So at the gate — powered down, "Activate ecosystem" waiting — an UPWARD
+       gesture releases the lock and hands scroll back to the page, which puts
+       the visitor into the film they came from.
+
+       This cannot be used to skip the activation. Only UPWARD intent releases;
+       downward is still refused, and `seize()` is re-armed off ScrollTrigger's
+       own geometry check, so coming back down re-locks at the gate with the
+       button still waiting. The gate stays unskippable; it just stops being a
+       trap. */
+    const atGate = () =>
+      !activatedRef.current && descentDoneRef.current && !travellingRef.current;
+
+    const leaveUpward = () => {
+      if (!heldRef.current) return false;
+      releaseScroll();
+      heldRef.current = false;
+      /* EXITING, not merely unheld. `seize()` early-returns on
+         `heldRef || exitingRef`, and the ScrollTrigger watcher below re-seizes
+         on EVERY update while the section still covers the viewport. Releasing
+         without this flag meant the lock came straight back on the next frame:
+         the page released and was re-grabbed before it had moved a pixel, which
+         measured as exactly 0px of travel for 100 wheel events. The flag is
+         cleared by that same watcher once the section has genuinely been left,
+         so coming back down re-seizes at the gate as normal. */
+      exitingRef.current = true;
+      getLenis()?.start();
+      return true;
+    };
+
+    let ecoTouchY = 0;
+    const onEcoTouchStart = (ev: TouchEvent) => { ecoTouchY = ev.touches[0]?.clientY ?? 0; };
+
+    const blockWheel = (ev: Event) => {
+      const t = ev.target as HTMLElement | null;
+      if (t?.closest?.("[data-eco-scrollable]")) return;
+      if (atGate()) {
+        // wheel carries its own direction; touch has to be measured against
+        // where the finger started
+        const dy = (ev as WheelEvent).deltaY;
+        const up =
+          typeof dy === "number" && !Number.isNaN(dy)
+            ? dy < 0
+            : ((ev as TouchEvent).touches?.[0]?.clientY ?? 0) - ecoTouchY > 12;
+        if (up && leaveUpward()) return;
+      }
+      ev.preventDefault();
+    };
     /** Wheel/touch only ever ADVANCE the descent; they never move the page.
      *  ONE FLICK IS ONE STEP. A time debounce is not enough — a trackpad flick
      *  runs 2.5s and would clear a 700ms debounce three times over, putting the
      *  orb in the ground in a single swipe. Same test the journey uses: the
      *  wheel has to fall silent, and then a real push has to arrive. */
-    let gestureArmed = true;
-    let quietTimer: number | undefined;
-    let rearmAt = 0;
-    const onGesture = (ev: Event) => {
-      if (!heldRef.current) return;
-      const now = performance.now();
-      // Arm on silence OR on elapsed time. Silence alone froze the descent for
-      // anyone who never stops scrolling, and a delta threshold froze it for
-      // anyone scrolling gently — a trackpad emits deltas far below 20 when you
-      // move slowly. Either condition re-arms, so nothing can jam it.
-      if (now >= rearmAt) gestureArmed = true;
-      if (gestureArmed && Math.abs((ev as WheelEvent).deltaY ?? 999) >= 4) {
-        gestureArmed = false;
-        rearmAt = now + 900;
-        stepDescent();
-      }
-      window.clearTimeout(quietTimer);
-      quietTimer = window.setTimeout(() => { gestureArmed = true; }, 420);
-    };
     const blockKeys = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") { gateTween?.progress(1); return; } // never trap a keyboard user
+      // never trap a keyboard user — Escape completes whichever beat is playing
+      if (ev.key === "Escape") { descentTween?.progress(1); gateTween?.progress(1); return; }
+      // same upward exit as the wheel, for anyone driving by keyboard
+      if (atGate() && (ev.key === "ArrowUp" || ev.key === "PageUp" || ev.key === "Home")) {
+        if (leaveUpward()) return;
+      }
       if (SCROLL_KEYS.has(ev.key)) ev.preventDefault();
     };
     // Lenis being stopped does NOT stop a scrollbar drag, so hold the position
@@ -225,9 +315,19 @@ export default function EcosystemSequence() {
       if (!idle) return;
       const o = c01((p - (BAND_END - IDLE_FADE)) / IDLE_FADE);
       idle.style.opacity = String(o);
-      if (o > 0 && !idleLitRef.current) {
+      if (o > 0) {
         idleLitRef.current = true;
-        idleARef.current?.play().catch(() => {});
+        /* RE-ASSERT, don't fire once.
+           play() returns a promise that REJECTS if the element isn't ready —
+           which is exactly what the nav jump causes, because it lands straight
+           in the lit hub before the source has loaded. The old code latched
+           idleLit BEFORE knowing whether play() had succeeded, so a single
+           rejection froze the hologram on frame 0 for good: the double-buffer
+           below only swaps once `front` is playing, so it never started either.
+           Asking again while both buffers are idle costs nothing. */
+        const a = idleARef.current;
+        const b = idleBRef.current;
+        if (a && b && a.paused && b.paused) a.play().catch(() => {});
       } else if (o === 0 && idleLitRef.current) {
         idleLitRef.current = false;
         idleARef.current?.pause();
@@ -238,6 +338,52 @@ export default function EcosystemSequence() {
     /** forward: leave the lit hub for the white void. RELEASE is the last
      *  scroll position this section owns, so one tween lands us on the void's
      *  PIN with no reverse scrub in between. */
+    /** RE-ARM ONCE THE SECTION IS GENUINELY GONE.
+     *  `exitingRef` is raised by the two buttons so their own scroll animation
+     *  isn't fought by seize(). It was only ever lowered again by a nav jump,
+     *  which meant that after pressing either button the section could NEVER
+     *  recapture — scroll then carried you in and out of the ecosystem freely
+     *  for the rest of the visit. That is the opposite of the rule: the buttons
+     *  decide, not the wheel.
+     *  Lowering it the moment the section is fully off screen keeps the exit
+     *  working (you can leave) while guaranteeing that coming back captures
+     *  again instead of free-scrolling through a live hologram. */
+    function armIfClear() {
+      if (!exitingRef.current) return;
+      const r = section.getBoundingClientRect();
+      const fullyGone = r.bottom <= 0 || r.top >= window.innerHeight;
+      if (fullyGone) exitingRef.current = false;
+    }
+
+    /** RE-MEASURE ON RESIZE.
+     *  There was no resize handling here at all. `pinnedTo` is an absolute pixel
+     *  position derived from the section's height and the viewport; change the
+     *  window and every one of those inputs moves, but the section carried on
+     *  pinning to the old number — so the stage jumped, the strip showed the
+     *  wrong frame for the position, and the whole thing looked blown apart.
+     *  Recompute against live geometry for whichever state we are actually in. */
+    function remeasure() {
+      ScrollTrigger.refresh();
+      if (!heldRef.current) return;
+      const pinned = Math.max(1, section.offsetHeight - window.innerHeight);
+      const at = activatedRef.current ? BAND_END : descentDoneRef.current ? GATE_AT : 0;
+      // Mid-descent the tween owns the position; let it finish against the new
+      // geometry rather than yanking the orb to the end of its fall.
+      if (travellingRef.current) return;
+      pinnedTo = Math.round(section.offsetTop + pinned * at);
+      getLenis()?.scrollTo(pinnedTo, { immediate: true, force: true });
+      window.scrollTo(0, pinnedTo);
+      ScrollTrigger.update();
+      paintStage();
+    }
+    let resizeTimer: number | undefined;
+    const onResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(remeasure, 120);
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+
     /** Capture the section. Idempotent — safe to call from any trigger. */
     function seize() {
       if (heldRef.current || exitingRef.current) return;
@@ -246,7 +392,10 @@ export default function EcosystemSequence() {
       // Once the ecosystem has been activated the hub IS this section's state,
       // so coming back to it lands on the lit hub with its two controls — not
       // back at a descent step it has already played.
-      const at = activatedRef.current ? BAND_END : DESCENT_STEPS[stepRef.current];
+      // Three landing states, in order of precedence: the lit hub if the
+      // ecosystem has been activated, the orb at rest if the descent has
+      // already played, otherwise the top of the descent about to play.
+      const at = activatedRef.current ? BAND_END : descentDoneRef.current ? GATE_AT : 0;
       pinnedTo = Math.round(section.offsetTop + pinned * at);
       if (activatedRef.current) { settledRef.current = true; setCue(true); }
       const lenis = getLenis();
@@ -255,26 +404,30 @@ export default function EcosystemSequence() {
       window.scrollTo(0, pinnedTo);
       ScrollTrigger.update();
       window.addEventListener("wheel", blockWheel, { passive: false });
+      window.addEventListener("touchstart", onEcoTouchStart, { passive: true });
       window.addEventListener("touchmove", blockWheel, { passive: false });
       window.addEventListener("keydown", blockKeys);
       window.addEventListener("scroll", holdScroll);
-      window.addEventListener("wheel", onGesture, { passive: true });
-      window.addEventListener("touchend", onGesture, { passive: true });
+
+      // Arriving fresh: the orb falls on its own. Arriving back to a descent
+      // already seen: the button is simply there.
+      if (!activatedRef.current && !descentDoneRef.current) playDescent();
+      else if (!activatedRef.current) setSuites(true);
     }
 
-    /** One gesture = one step of the descent. Ignored once the orb is down —
-     *  from there the buttons are the only controls. */
-    function stepDescent() {
-      if (!heldRef.current || travellingRef.current) return;
-      if (stepRef.current >= DESCENT_STEPS.length - 1) return;
-      const to = stepRef.current + 1;
+    /** The orb falls, once, at its authored pace. Nothing to press, nothing to
+     *  flick — this is a passenger moment. `ease: "none"` over 6.0417s across
+     *  144 frames IS the clip's native 24fps, same as the activation gate. */
+    function playDescent() {
+      if (travellingRef.current || descentDoneRef.current) return;
       travellingRef.current = true;
+      setSuites(false);
       const pinned = section.offsetHeight - window.innerHeight;
       const from = { y: pinnedTo };
-      const target = Math.round(section.offsetTop + pinned * DESCENT_STEPS[to]);
-      gsap.to(from, {
+      const target = Math.round(section.offsetTop + pinned * GATE_AT);
+      descentTween = gsap.to(from, {
         y: target,
-        duration: DESCENT_S / (DESCENT_STEPS.length - 1),
+        duration: DESCENT_S,
         ease: "none",
         onUpdate: () => {
           getLenis()?.stop();
@@ -284,8 +437,8 @@ export default function EcosystemSequence() {
         },
         onComplete: () => {
           travellingRef.current = false;
-          stepRef.current = to;
-          if (to === DESCENT_STEPS.length - 1) setSuites(true); // orb is down
+          descentDoneRef.current = true;
+          setSuites(true);                       // orb is down — offer the button
         },
       });
     }
@@ -335,24 +488,60 @@ export default function EcosystemSequence() {
       });
     }
 
-    /** GO BACK — to the orb at rest in the floor, with scroll handed back so
-     *  they can carry on up into the gym. Scrolling FORWARD again re-arms this
-     *  section: without that they slid straight through the ecosystem into the
-     *  void with no controls at all, having left the hub behind. */
+    /** GO BACK — LEAVE the ecosystem, upward, into the gym above it.
+     *
+     *  It used to park you at the orb-at-rest frame, which is still INSIDE this
+     *  section, and hand scroll back without ever recapturing. That is what let
+     *  the wheel walk you in and out of a live hologram: the section was on
+     *  screen but had given up control of it, so nothing held the position and
+     *  Lenis scrolled straight through the beat. Preventing wheel events does
+     *  not help there — Lenis scrolls programmatically, so only holdScroll can
+     *  stop it, and holdScroll is only attached while the section is held.
+     *
+     *  Landing a full viewport above the section's top puts it entirely off
+     *  screen, which lets `armIfClear` re-arm. Scroll back down and the section
+     *  captures again properly and lands on the lit hub. So the buttons move
+     *  you between beats and the wheel never does — which is the rule. */
     function goBack() {
-      exitingRef.current = true;
-      heldRef.current = false;
-      setCue(false);
-      releaseScroll();
+      if (travellingRef.current) return;
+      travellingRef.current = true;
+      setCue(false);                 // nodes and controls go first
+
+      /* PLAY THE ACTIVATION BACKWARDS.
+         Cutting straight to the orb-at-rest frame threw away the one thing that
+         makes this section feel like a machine — you watched it power up, so
+         you should watch it power down. The whole chain is a frame strip
+         precisely so it runs in reverse as cleanly as it runs forward, and this
+         tween scrubs the activation's 145 frames back the way they came.
+         The section stays HELD for the whole scrub, so scroll is still refused
+         throughout — the button is driving, not the wheel. */
       const pinned = section.offsetHeight - window.innerHeight;
-      const y = Math.round(section.offsetTop + pinned * GATE_AT);
-      const lenis = getLenis();
-      lenis ? lenis.scrollTo(y, { duration: 1.4 }) : window.scrollTo({ top: y, behavior: "smooth" });
-      // …and it does NOT take the screen back. Re-arming meant the next flick
-      // re-seized and yanked straight to the hub — the section vanished, jumped
-      // and dumped you back where you had just left. Scroll stays yours from
-      // here, both ways; the hub's controls simply reappear if you scroll far
-      // enough forward to be standing in front of it again.
+      const from = { y: pinnedTo };
+      const target = Math.round(section.offsetTop + pinned * GATE_AT);
+      gateTween?.kill();
+      descentTween = gsap.to(from, {
+        y: target,
+        duration: REVERSE_S,
+        ease: "none",
+        onUpdate: () => {
+          getLenis()?.stop();
+          pinnedTo = Math.round(from.y);
+          window.scrollTo(0, pinnedTo);
+          ScrollTrigger.update();
+          paintStage();              // drives the strip AND fades the hub out
+        },
+        onComplete: () => {
+          travellingRef.current = false;
+          // Back to BEFORE activation. The descent stays "done" so the fall
+          // does not replay, and the hologram is dropped so paintIdle relights
+          // it cleanly the next time the gate fires.
+          activatedRef.current = false;
+          settledRef.current = false;
+          idleLitRef.current = false;
+          descentDoneRef.current = true;
+          setSuites(true);           // offer "Activate ecosystem" again
+        },
+      });
     }
     navRef.current = { goForward, goBack, activate };
 
@@ -365,14 +554,16 @@ export default function EcosystemSequence() {
       // frame, so dropping the listeners without stopping it left something
       // still driving the page — the nav escape hatch appeared to do nothing.
       gateTween?.kill();
+      // The descent drives window.scrollTo every frame too, so it has to stop
+      // for the same reason — a live tween outlives the listeners otherwise.
+      descentTween?.kill();
+      travellingRef.current = false;
       window.clearTimeout(ceilingTimer);
       window.removeEventListener("wheel", blockWheel);
-      window.removeEventListener("wheel", onGesture);
-      window.removeEventListener("touchend", onGesture);
+      window.removeEventListener("touchstart", onEcoTouchStart);
       window.removeEventListener("touchmove", blockWheel);
       window.removeEventListener("keydown", blockKeys);
       window.removeEventListener("scroll", holdScroll);
-      window.clearTimeout(quietTimer);
       lockedRef.current = false;
       settledRef.current = false;
       setCue(false);
@@ -417,6 +608,7 @@ export default function EcosystemSequence() {
       lenis?.scrollTo(pinnedTo, { immediate: true, force: true });
       lenis?.stop();
       window.addEventListener("wheel", blockWheel, { passive: false });
+      window.addEventListener("touchstart", onEcoTouchStart, { passive: true });
       window.addEventListener("touchmove", blockWheel, { passive: false });
       window.addEventListener("keydown", blockKeys);
       window.addEventListener("scroll", holdScroll);
@@ -505,15 +697,51 @@ export default function EcosystemSequence() {
          pin. Calling it deliberately is both shorter and the only version that
          cannot drift from the real path — it reads activatedRef itself and
          pins to BAND_END, sets settled, raises the cue and attaches every
-         listener. `stepRef` is wound to the end of the descent because the orb
-         IS down: without it a later seize would pin back to a descent step. */
-      stepRef.current = DESCENT_STEPS.length - 1;
+         listener. The descent is marked done because the orb IS down: without
+         it a later seize would replay the whole fall underneath the lit hub. */
+      descentDoneRef.current = true;
       heldRef.current = false;
       exitingRef.current = false;
       seize();
+
+      /* RE-ASSERT THE LANDING FOR A FEW FRAMES.
+         Measuring once is not enough. refresh() and Lenis both finish settling
+         AFTER this handler returns, and ScrollTrigger re-runs its own resize
+         pass on the frame after that — so a viewport resize any time before the
+         jump left the first measurement stale and the nav landed on GATE_AT
+         (the orb at rest, "Activate ecosystem" still waiting) instead of
+         BAND_END (the lit hub). That is a whole beat short, and it looked like
+         the nav was pointed at the wrong place.
+         Recomputing from live geometry on the next few frames costs nothing and
+         makes the landing independent of when anything else settles. */
+      let checks = 0;
+      const reassertLanding = () => {
+        const p = Math.max(1, section.offsetHeight - window.innerHeight);
+        const want = Math.round(section.offsetTop + p * BAND_END);
+        if (Math.abs(window.scrollY - want) > 2) {
+          pinnedTo = want;
+          getLenis()?.scrollTo(want, { immediate: true, force: true });
+          window.scrollTo(0, want);
+          ScrollTrigger.update();
+          paintStage();
+        }
+        if (++checks < 4) requestAnimationFrame(reassertLanding);
+      };
+      requestAnimationFrame(reassertLanding);
     };
     window.addEventListener("lumin:jumpTo", onJump);
 
+    /* ARRIVING AT /#ecosystem FROM ANOTHER PAGE.
+       The nav's "Products" tab jumps here by dispatching lumin:jumpTo, but a
+       product page's "Ecosystem" link is a real navigation — the browser lands
+       on a fresh document with a hash and nothing was reading it, so the visitor
+       was dropped at the very top of the film and had to scroll the whole
+       journey back. Firing the same jump the nav uses puts them on the lit hub,
+       which is what the link says it does.
+
+       Deferred until the loader has lifted: the jump measures section geometry,
+       and measuring while PageLoader still owns the screen reads a page that has
+       not settled. */
     const ctx = gsap.context(() => {
       // 0. entry guard — spans the whole time the section touches the
       //    viewport, so it covers the approach that trigger 1 never sees.
@@ -568,12 +796,31 @@ export default function EcosystemSequence() {
         start: "top bottom",
         end: "bottom top",
         onUpdate: () => {
+          armIfClear();
+          // Left under our own steam? Stop exiting once the section no longer
+          // covers the viewport, so a later return can seize normally.
+          if (exitingRef.current && !heldRef.current) {
+            const rr = section.getBoundingClientRect();
+            if (rr.bottom <= window.innerHeight || rr.top > 0) exitingRef.current = false;
+          }
           if (heldRef.current || exitingRef.current) return;
-          if (section.getBoundingClientRect().top <= 0) seize();
+          // `top <= 0` alone is ALSO true once you are past the section, so on
+          // its own it let a resize out in the white void re-seize the
+          // ecosystem and drag scroll backwards into the hub. Require the
+          // section to still cover the viewport — that is only true while you
+          // are genuinely inside its pinned range.
+          const r = section.getBoundingClientRect();
+          if (r.top <= 0 && r.bottom > window.innerHeight) seize();
         },
         onRefresh: () => {
+          armIfClear();
+          if (exitingRef.current && !heldRef.current) {
+            const rr = section.getBoundingClientRect();
+            if (rr.bottom <= window.innerHeight || rr.top > 0) exitingRef.current = false;
+          }
           if (heldRef.current || exitingRef.current) return;
-          if (section.getBoundingClientRect().top <= 0) seize();
+          const r = section.getBoundingClientRect();
+          if (r.top <= 0 && r.bottom > window.innerHeight) seize();
         },
       });      // 3. the idle clips are small but pointless to fetch early; give them
       //    plenty of lead time without competing with the hero's frames.
@@ -590,13 +837,45 @@ export default function EcosystemSequence() {
       });
     }, section);
 
+    if (window.location.hash === "#ecosystem") {
+      /* HIDE THE OPENING WHILE WE TRAVEL, AND DO NOT WAIT FOR THE LOADER.
+         The jump needs real geometry, so it cannot run before first paint —
+         which meant a visitor returning from a product page watched the orb and
+         the top of the film for a beat before being thrown to the hub.
+
+         The first attempt at this waited for `lumin:emergeDone` before jumping,
+         which was worse: the loader's emerge clip runs for seconds, so the
+         cover sat black for ~8s. Layout is what the jump actually needs, not
+         the loader, so it goes on the next frames instead — and the gates are
+         released first so nothing else is holding scroll when we land. */
+      setDeepLinkCover(true);
+      let tries = 0;
+      const land = () => {
+        window.dispatchEvent(new CustomEvent("lumin:releaseGates"));
+        ScrollTrigger.refresh();
+        window.dispatchEvent(new CustomEvent("lumin:jumpTo", { detail: "ecosystem" }));
+        // Re-assert while Lenis and ScrollTrigger finish settling, exactly as
+        // the nav jump does, then reveal.
+        if (++tries < 4) {
+          window.setTimeout(land, 140);
+        } else {
+          window.setTimeout(() => setDeepLinkCover(false), 200);
+        }
+      };
+      requestAnimationFrame(() => requestAnimationFrame(() => window.setTimeout(land, 80)));
+    }
+
     return () => {
       ctx.revert();
       window.removeEventListener("lumin:releaseGates", onNavRelease);
       window.removeEventListener("lumin:jumpTo", onJump);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+      window.clearTimeout(resizeTimer);
       window.clearTimeout(handoff);
       descentGate?.destroy();
       gateTween?.kill();
+      descentTween?.kill();
       [ceilingTimer, cueTimer].forEach(window.clearTimeout);
       if (lockedRef.current) {
         lockedRef.current = false;
@@ -622,6 +901,14 @@ export default function EcosystemSequence() {
     let front = a, back = b, armed = false, raf = 0;
 
     const tick = () => {
+      /* SELF-HEAL. At the lit hub scroll is refused, so paintIdle may never run
+         again — nothing would ever retry a play() that got rejected on arrival.
+         This loop is already running every frame, so it is the one place that
+         can always recover: if the layer is visible and neither buffer is
+         playing, start one. */
+      if (front.paused && back.paused && Number(idleLayerRef.current?.style.opacity || "0") > 0) {
+        front.play().catch(() => {});
+      }
       const d = front.duration;
       if (d && !front.paused && front.currentTime >= d - FADE && !armed) {
         armed = true;
@@ -650,9 +937,22 @@ export default function EcosystemSequence() {
   }, []);
 
   return (
-    // -mt-[100vh] closes the hero's un-pinned dead zone — see the header note.
-    // `isolate` keeps our layer stack from tangling with the hero's z-indexed
-    // children, which share the root stacking context.
+    <>
+    {/* DEEP-LINK COVER — above everything, including the loader, and only ever
+        raised when the page was opened directly at #ecosystem. */}
+    {deepLinkCover && (
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed", inset: 0, zIndex: 300,
+          background: "#05070d", pointerEvents: "none",
+          transition: "opacity .26s ease",
+        }}
+      />
+    )}
+    {/* -mt-[100vh] closes the hero's un-pinned dead zone — see the header note.
+        `isolate` keeps our layer stack from tangling with the hero's z-indexed
+        children, which share the root stacking context. */}
     <section
       ref={sectionRef}
       data-nav-tone="dark"
@@ -682,24 +982,38 @@ export default function EcosystemSequence() {
         {/* the living hub, double-buffered — dissolves in over the strip's
             last frame and back out of it on the way up */}
         <div ref={idleLayerRef} className="absolute inset-0 z-[2]" style={{ opacity: 0 }}>
+          {/* The v5 symbol master IS the idle now. The old hub's webm/mp4 and
+              its poster are deliberately not referenced anywhere in this tree —
+              while they were, the pre-hydration markup showed them. The poster
+              is v5's own frame 1, which is also the activation's last frame, so
+              there is no black gap before the video decodes. */}
           <video
             ref={idleARef}
             muted playsInline preload="none"
-            poster="/eco/hub/eco-idle-hologram-poster.jpg"
+            poster="/eco/hub/idle-v5-poster.jpg"
             className="absolute inset-0 h-full w-full object-cover"
           >
-            <source src="/eco/hub/eco-idle-hologram.webm" type="video/webm" />
-            <source src="/eco/hub/eco-idle-hologram.mp4" type="video/mp4" />
+            <source src="/eco/hub/ecosystem-symbol-master-v5.mp4" type="video/mp4" />
           </video>
           <video
             ref={idleBRef}
             muted playsInline preload="none"
+            poster="/eco/hub/idle-v5-poster.jpg"
             className="absolute inset-0 h-full w-full object-cover"
             style={{ opacity: 0 }}
           >
-            <source src="/eco/hub/eco-idle-hologram.webm" type="video/webm" />
-            <source src="/eco/hub/eco-idle-hologram.mp4" type="video/mp4" />
+            <source src="/eco/hub/ecosystem-symbol-master-v5.mp4" type="video/mp4" />
           </video>
+        </div>
+
+        {/* The eleven node briefs, over the lit hub. Only armed once the
+            activation has finished — during the descent and the boot-up the
+            nodes are not there yet, so nothing should be clickable.
+            z-[4] puts an open dossier above the exit controls; the wrapper is
+            pointer-events:none so the hologram stays untouched until a node or
+            the panel itself claims the pointer. */}
+        <div className="pointer-events-none absolute inset-0 z-[4]">
+          <EcosystemNodeHud active={cueOn} />
         </div>
 
         {/* Exit controls, not a scroll hint. They appear only once the
@@ -757,5 +1071,6 @@ export default function EcosystemSequence() {
         </div>
       </div>
     </section>
+    </>
   );
 }

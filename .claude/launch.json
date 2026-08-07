@@ -7,6 +7,13 @@
       "runtimeArgs": ["run", "dev"],
       "cwd": "/Users/graysonchoate/Documents/Lumin AI/Official Lumin Website Folder/lumin-site",
       "port": 3000
+    },
+    {
+      "name": "lumin-build",
+      "runtimeExecutable": "/Users/graysonchoate/.nvm/versions/node/v24.18.0/bin/npx",
+      "runtimeArgs": ["serve", "-s", "out", "-l", "4000"],
+      "cwd": "/Users/graysonchoate/Documents/Lumin AI/Official Lumin Website Folder/lumin-site",
+      "port": 4000
     }
   ]
 }

@@ -44,7 +44,16 @@ import { getLenis } from "@/components/SmoothScroll";
  * the floor rather than queued. That is the second half of "it never skips".
  */
 
-export type SceneStepper = { destroy: () => void };
+export type SceneStepper = {
+  destroy: () => void;
+  /**
+   * Put the journey ON a stop without travelling to it — a deep link arriving
+   * at `#product-station` has no previous stop to travel from. Scroll is moved
+   * to that anchor and `at` is set to match, so the very next gesture steps one
+   * leg from THERE, under the same rules as any other stop.
+   */
+  parkAt: (i: number) => void;
+};
 
 const KEYS_FWD = new Set(["ArrowDown", "PageDown", " ", "Spacebar"]);
 const KEYS_BACK = new Set(["ArrowUp", "PageUp"]);
@@ -85,7 +94,8 @@ const SUSTAIN_MS = 2600;
 const MIN_PUSH = 25;
 
 export function createSceneStepper({
-  section, anchors, totalFrames, onDepart, onArrive, onExit,
+  section, anchors, totalFrames, onDepart, onArrive, onExit, onPark, onHeadingTo,
+  travel, legSeconds,
   framesPerSec = 24, settleMs = 420,
 }: {
   section: HTMLElement;
@@ -94,10 +104,55 @@ export function createSceneStepper({
   /** how many frames the section's progress spans, so travel can be timed in
    *  FILM time rather than screen distance */
   totalFrames: number;
-  /** the film has started moving — hide anything pinned to the frame */
-  onDepart: () => void;
+  /** the film has started moving — hide anything pinned to the frame.
+   *  `dir` and `to` are additive: the media layer needs to know WHICH leg. */
+  onDepart: (dir?: number, to?: number) => void;
+  /**
+   * THE MEDIA OWNS THE PICTURE; THIS FILE STILL OWNS THE GESTURE.
+   *
+   * When supplied, a leg is not a frame scrub — it is an approved transition
+   * clip playing at its own authored rate. The scroll tween below still runs,
+   * because engage/disengage, the resize re-pin and the handoff into the
+   * ecosystem are all keyed off scroll position, but it is now BOOKKEEPING: it
+   * is paced to the clip rather than the clip being paced to it, and the leg is
+   * not over until BOTH the tween and the clip have finished.
+   *
+   * Every gesture rule above this line is unchanged. Input during travel is
+   * still dropped on the floor, arming still needs quiet-or-sustain, and a leg
+   * still cannot be lengthened, shortened or skipped by scrolling harder —
+   * `travelling` simply now stays true for the length of a video instead of the
+   * length of a tween.
+   */
+  travel?: (from: number, to: number, dir: number) => Promise<void>;
+  /** the leg's authored length in seconds, read off the clip's frame count */
+  legSeconds?: (from: number, to: number, dir: number) => number;
   /** resting on anchor `i`, frame settled. Show the callout HERE and only here. */
   onArrive: (i: number) => void;
+  /**
+   * The frame has PARKED on anchor `i` — fired the instant the tween completes,
+   * with none of `settleMs` waited out.
+   *
+   * This exists because the idle map video and the callout used to share one
+   * gate, so both waited the full 420ms settle. Measured on a screen recording
+   * of the Connect stop: the picture stopped moving at 3.13s and every frame
+   * was identical until 3.63s, when the card and the light switched on
+   * together — 0.48s of completely dead screen on every stop.
+   *
+   * The settle is right for the CALLOUT: it is pinned to the object at the
+   * anchor frame, and popping it early made it slide into shot. It is wrong for
+   * the map video, which is full-frame and cares nothing about where the frame
+   * landed. So the map rides this, the callout keeps `onArrive`.
+   */
+  onPark?: (i: number) => void;
+  /**
+   * Fired at the START of a leg with the anchor being travelled to, so its
+   * media can be mounted and decoded during the journey instead of on arrival.
+   *
+   * Mounting the map video at the stop cost a measured 493ms between the frame
+   * parking and the video reaching `canplay` — dead screen every single time.
+   * The leg itself is well over a second, so the load is free if it starts here.
+   */
+  onHeadingTo?: (i: number) => void;
   /** stepped past the last anchor: control is handed back to the page */
   onExit: () => void;
   /**
@@ -172,8 +227,9 @@ export function createSceneStepper({
     if (armed && Math.abs(pushed) >= MIN_PUSH) step(Math.sign(pushed));
   }
 
-  function step(dir: number) {
+  async function step(dir: number) {
     if (travelling || !engaged) return;
+    const from = at;
     const next = at + dir;
     if (next < -1) return;                       // nothing above the opening
     const last = anchors.length - 1;
@@ -181,45 +237,59 @@ export function createSceneStepper({
     travelling = true;
     disarm();
     window.clearTimeout(settleT);
-    onDepart();
+    onDepart(dir, next);
+    // Hand the destination over NOW, at the top of the leg, so its media has
+    // the whole journey to load. Mounting it on arrival cost a measured 493ms
+    // of dead screen waiting for `canplay`.
+    if (next >= 0 && next <= last) onHeadingTo?.(next);
 
     const fromY = window.scrollY;
     const toY = next > last ? endY() : next < 0 ? section.offsetTop : yFor(anchors[next]);
-    // CONSTANT RATE, measured in film. A wide gap between two products takes
-    // proportionally longer than a narrow one, which is what "even tempo"
-    // means — a fixed duration per step would do the opposite and make the
-    // wide gaps race.
+    // The leg lasts exactly as long as the approved clip does. Falling back to
+    // the old distance/rate maths keeps this file usable without a media layer.
     const frames = Math.abs(toY - fromY) / Math.max(1, span()) * totalFrames;
-    const duration = Math.max(0.4, frames / framesPerSec);
+    const duration = legSeconds
+      ? legSeconds(from, next, dir)
+      : Math.max(0.4, frames / framesPerSec);
 
     const o = { y: fromY };
     tween?.kill();
-    tween = gsap.to(o, {
-      y: toY, duration,
-      // Linear on purpose. The ease-in/out is supplied by the frame scrub
-      // downstream, which softens both ends on its own — doing it here as well
-      // would peak the middle of every leg well above 24fps and undo the point
-      // of pacing to the film's own rate.
-      ease: "none",
-      onUpdate: () => {
-        getLenis()?.stop();                      // we are the only thing moving the page
-        window.scrollTo(0, Math.round(o.y));
-        ScrollTrigger.update();
-      },
-      onComplete: () => {
-        at = next;
-        restY = toY;
-        travelling = false;
-        if (next > last) { disengage(); onExit(); return; }
-        if (next < 0) { disarm(); return; }      // back at the opening, no callout
-        // Let the scrubbed frame land before we call this a stop. The callout
-        // is pinned to the object at the anchor FRAME, so popping it while the
-        // picture is still easing in is what made it slide into view instead of
-        // appearing out of the thing it points at.
-        settleT = window.setTimeout(() => onArrive(next), settleMs);
-        disarm();
-      },
+    const scrolled = new Promise<void>((resolve) => {
+      tween = gsap.to(o, {
+        y: toY, duration,
+        // Linear on purpose. The clip supplies its own easing; adding another
+        // here would desynchronise the scrollbar from the picture.
+        ease: "none",
+        onUpdate: () => {
+          getLenis()?.stop();                    // we are the only thing moving the page
+          window.scrollTo(0, Math.round(o.y));
+          ScrollTrigger.update();
+        },
+        onComplete: () => resolve(),
+      });
     });
+
+    // BOTH have to finish. The clip is the one that matters visually, and it is
+    // allowed to be a frame or two longer than the tween without the stop being
+    // declared early. Input stays discarded for the whole of this await, which
+    // is what makes "scrolling harder cannot skip a stop" true for video legs
+    // exactly as it was for scrubbed ones.
+    await Promise.all([scrolled, travel ? travel(from, next, dir) : Promise.resolve()]);
+    if (!engaged) return;                        // nav bailed us out mid-leg
+
+    at = next;
+    restY = toY;
+    travelling = false;
+    if (next > last) { disengage(); onExit(); return; }
+    if (next < 0) { disarm(); return; }          // back at the opening, no callout
+    // The idle is ALREADY looping — the media layer starts it the instant the
+    // transition ends, without waiting for any of this. The settle below is the
+    // product brief's alone: it is pinned to the object in the parked frame, so
+    // popping it early made it slide into view instead of appearing out of the
+    // thing it points at.
+    onPark?.(next);
+    settleT = window.setTimeout(() => onArrive(next), settleMs);
+    disarm();
   }
 
   const onWheel = (e: WheelEvent) => record(e.deltaY);
@@ -308,6 +378,19 @@ export function createSceneStepper({
   window.addEventListener("lumin:jumpTo", bail);
 
   return {
+    parkAt(i: number) {
+      if (i < 0 || i >= anchors.length) return;
+      tween?.kill();
+      travelling = false;
+      at = i;
+      restY = yFor(anchors[i]);
+      window.scrollTo(0, restY);
+      ScrollTrigger.update();
+      onPark?.(i);
+      window.clearTimeout(settleT);
+      settleT = window.setTimeout(() => onArrive(i), settleMs);
+      disarm();
+    },
     destroy() {
       disengage();
       watcher.kill();

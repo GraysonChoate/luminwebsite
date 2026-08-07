@@ -40,7 +40,13 @@ export default function NavPill() {
       // the pill, which is how it stayed white over the white void.
       const el = document.elementFromPoint(window.innerWidth / 2, 150);
       const owner = el?.closest<HTMLElement>("[data-nav-tone]");
-      setOnLight(owner?.dataset.navTone === "light");
+      // KEEP THE LAST KNOWN TONE WHEN NOTHING OWNS THE POINT.
+      // This used to read `=== "light"`, so any miss resolved to FALSE — i.e. it
+      // asserted "dark" rather than admitting it did not know. A full-screen
+      // fixed layer with no tone (this component's own mobile overlay was one)
+      // sits over the sample point and produced exactly that miss, which over
+      // the white void means white type on white. A miss should change nothing.
+      if (owner) setOnLight(owner.dataset.navTone === "light");
     };
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(sample); };
     sample();
@@ -139,7 +145,7 @@ export default function NavPill() {
   return (
     <>
       <header
-        className="fixed left-1/2 z-50 w-[calc(100%-2*var(--container-pad))] max-w-[1176px] -translate-x-1/2"
+        className="nav-pill-shell fixed left-1/2 z-50 max-w-[1176px] -translate-x-1/2"
         style={{ top: "var(--nav-top)" }}
       >
         <div
@@ -191,18 +197,15 @@ export default function NavPill() {
             ))}
           </nav>
 
-          <div className="hidden items-center gap-2.5 lg:flex">
+          <div className="hidden items-center lg:flex">
             <button
-              className="btn btn-secondary"
+              className="btn btn-primary"
               onClick={() => {
                 window.dispatchEvent(new CustomEvent("lumin:preselect", { detail: "Product Demo" }));
-                go("#contact");
+                go("#cta");
               }}
             >
               {NAV.cta1}
-            </button>
-            <button className="btn btn-primary" onClick={() => go("#contact")}>
-              {NAV.cta2}
             </button>
           </div>
 
@@ -223,7 +226,11 @@ export default function NavPill() {
       {menuOpen && (
         <div
           className="fixed inset-0 z-[60] flex flex-col justify-center gap-6 px-10 lg:hidden"
-          // the overlay is always dark, so it always takes the dark palette
+          // the overlay is always dark, so it always takes the dark palette —
+          // and it must SAY so, because it covers the tone sample point. While
+          // it declared nothing, opening the menu made the sampler find no
+          // owner at all.
+          data-nav-tone="dark"
           style={{
             background: "rgba(33,33,33,0.97)",
             "--nav-hot": "#ffffff",
@@ -248,8 +255,7 @@ export default function NavPill() {
             </button>
           ))}
           <div className="mt-4 flex gap-3">
-            <button className="btn btn-secondary" onClick={() => go("#contact")}>{NAV.cta1}</button>
-            <button className="btn btn-primary" onClick={() => go("#contact")}>{NAV.cta2}</button>
+            <button className="btn btn-primary" onClick={() => go("#cta")}>{NAV.cta1}</button>
           </div>
         </div>
       )}

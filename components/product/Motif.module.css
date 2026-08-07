@@ -1,0 +1,118 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOTIFS — one per product mode
+   ═══════════════════════════════════════════════════════════════════════════
+   A diagram of what the tool does, drawn behind its wordmark. Each is stroked
+   in the page's suite colour (inherited via --suite) and kept at low opacity so
+   the approved scene plate stays the room and the type stays the subject.
+
+   These are deliberately NOT interchangeable: `orbit` returns, `ledger` scans
+   rows, `macro` fills ratios. If one could be swapped onto another product
+   unnoticed, it would be decoration rather than character. */
+
+.motif {
+  position: absolute;
+  right: clamp(-40px, 2vw, 90px);
+  top: 50%;
+  translate: 0 -50%;
+  width: clamp(320px, 42vw, 660px);
+  aspect-ratio: 1;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0;
+  animation: motifIn 1.6s .5s cubic-bezier(.16,.84,.44,1) forwards;
+}
+@keyframes motifIn { to { opacity: .5; } }
+.motif svg { width: 100%; height: 100%; overflow: visible; }
+.motif * { vector-effect: non-scaling-stroke; }
+
+/* shared strokes */
+.ring, .beam, .spine, .track, .shelfLine, .beat, .bezel, .screen {
+  fill: none;
+  stroke: rgba(var(--suite-soft), .5);
+  stroke-width: 1;
+}
+
+/* ── ORBIT — Loops. It comes back around. ─────────────────────────────── */
+.spin { transform-origin: 200px 200px; animation: motifSpin 14s linear infinite; }
+.spinSlow { animation-duration: 22s; animation-direction: reverse; }
+@keyframes motifSpin { to { transform: rotate(360deg); } }
+.token { fill: rgba(var(--suite-hi), 1); filter: drop-shadow(0 0 8px rgba(var(--suite), 1)); }
+
+/* ── LATTICE — Core. Load-bearing. ────────────────────────────────────── */
+.joint { fill: rgba(var(--suite-hi), .95); animation: motifJoint 3.4s ease-in-out infinite; }
+@keyframes motifJoint { 0%,100% { opacity: .35; r: 3; } 50% { opacity: 1; r: 5; } }
+
+/* ── THREAD — Connect. A conversation in order. ───────────────────────── */
+.msg rect { fill: rgba(var(--suite), .3); stroke: rgba(var(--suite-soft), .6); stroke-width: 1; }
+.msg circle { fill: rgba(var(--suite-hi), .9); }
+.msg { opacity: 0; animation: motifMsg 5s ease-in-out infinite; }
+@keyframes motifMsg { 0%,72%,100% { opacity: 0; transform: translateY(6px); } 16%,58% { opacity: 1; transform: none; } }
+.pulse { fill: rgba(var(--suite-hi), 1); animation: motifTravel 5s ease-in-out infinite; }
+@keyframes motifTravel { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { transform: translateY(360px); opacity: 0; } }
+
+/* ── CONSOLE — Command Center. Many things, watched at once. ──────────── */
+.pane { fill: rgba(var(--suite), .16); stroke: rgba(var(--suite-soft), .55); stroke-width: 1;
+        opacity: 0; animation: motifPane 6s ease-in-out infinite; }
+@keyframes motifPane { 0%,86%,100% { opacity: .2; } 22%,64% { opacity: .85; } }
+.sweep { stroke: rgba(var(--suite-hi), .9); stroke-width: 2; filter: drop-shadow(0 0 8px rgba(var(--suite), 1));
+         animation: motifSweep 6s cubic-bezier(.4,0,.4,1) infinite; }
+@keyframes motifSweep { 0% { transform: translateY(20px); opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } 100% { transform: translateY(380px); opacity: 0; } }
+
+/* ── LEDGER — Asset Management. A register of physical things. ────────── */
+.row line { stroke: rgba(var(--suite-soft), .3); stroke-width: 1; }
+.row rect { fill: rgba(var(--suite), .5); }
+.row { opacity: .25; animation: motifRow 5.5s ease-in-out infinite; }
+@keyframes motifRow { 0%,70%,100% { opacity: .22; } 18%,52% { opacity: .9; } }
+
+/* ── CURRICULUM — Academy. Ordered progression. ───────────────────────── */
+.step circle { fill: rgba(var(--suite-hi), .95); }
+.step rect { fill: rgba(var(--suite), .45); }
+.step { opacity: 0; transform-origin: 70px 200px; animation: motifStep 6s ease-in-out infinite; }
+@keyframes motifStep { 0%,84%,100% { opacity: .18; } 20%,62% { opacity: 1; } }
+
+/* ── KINETIC — Move. The fastest page in the set. ─────────────────────── */
+.trail { fill: none; stroke: rgba(var(--suite-soft), .55); stroke-width: 1.5;
+         stroke-dasharray: 1; stroke-dashoffset: 1; pathLength: 1;
+         animation: motifTrail 3.2s cubic-bezier(.3,0,.3,1) infinite; }
+@keyframes motifTrail { 0% { stroke-dashoffset: 1; opacity: 0; } 22% { opacity: 1; } 70% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: -1; opacity: 0; } }
+.mover { fill: rgba(var(--suite-hi), 1); filter: drop-shadow(0 0 10px rgba(var(--suite), 1));
+         offset-path: path("M 20 380 Q 160 240 380 120"); animation: motifMove 3.2s cubic-bezier(.3,0,.3,1) infinite; }
+@keyframes motifMove { 0% { offset-distance: 0%; opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { offset-distance: 100%; opacity: 0; } }
+
+/* ── RHYTHM — Studio. A room moving together. ─────────────────────────── */
+.bar { fill: rgba(var(--suite), .55); transform-origin: center bottom;
+       animation: motifBar 1.5s cubic-bezier(.4,0,.4,1) infinite; }
+@keyframes motifBar { 0%,100% { transform: scaleY(.35); opacity: .5; } 50% { transform: scaleY(1); opacity: 1; } }
+.beat { stroke: rgba(var(--suite-hi), .7); stroke-width: 1.5; }
+
+/* ── DEVICE — Station. A screen, framed. ──────────────────────────────── */
+.bezel { stroke: rgba(var(--suite-soft), .75); stroke-width: 2; }
+.screen { fill: rgba(var(--suite), .2); }
+.scanline { stroke: rgba(var(--suite-hi), 1); stroke-width: 2; filter: drop-shadow(0 0 8px rgba(var(--suite), 1));
+            animation: motifScreen 4s cubic-bezier(.4,0,.4,1) infinite; }
+@keyframes motifScreen { 0% { transform: translateY(0); opacity: 0; } 12% { opacity: 1; } 84% { opacity: 1; } 100% { transform: translateY(248px); opacity: 0; } }
+
+/* ── SHELF — Market. Curated goods, lit. ──────────────────────────────── */
+.shelfLine { stroke: rgba(var(--suite-hi), .6); stroke-width: 1.5; }
+.good { fill: rgba(var(--suite), .42); stroke: rgba(var(--suite-soft), .5); stroke-width: 1;
+        transform-origin: center bottom; animation: motifGood 5s ease-in-out infinite; }
+@keyframes motifGood { 0%,80%,100% { opacity: .35; } 22%,58% { opacity: 1; } }
+
+/* ── MACRO — Fuel. Measured quantities. ───────────────────────────────── */
+.track { stroke: rgba(var(--suite-soft), .28); stroke-width: 6; }
+.fill {
+  fill: none; stroke: rgba(var(--suite-hi), .9); stroke-width: 6; stroke-linecap: round;
+  transform: rotate(-90deg); transform-origin: 200px 200px;
+  pathLength: 1; stroke-dasharray: 1;
+  filter: drop-shadow(0 0 6px rgba(var(--suite), .9));
+}
+.fillA { animation: motifFill 5s ease-in-out infinite; --to: .72; }
+.fillB { animation: motifFill 5s .18s ease-in-out infinite; --to: .48; }
+.fillC { animation: motifFill 5s .36s ease-in-out infinite; --to: .86; }
+@keyframes motifFill {
+  0%,100% { stroke-dashoffset: 1; }
+  45%,72% { stroke-dashoffset: calc(1 - var(--to)); }
+}
+
+@media (max-width: 900px) { .motif { opacity: 0 !important; animation: none; } }
+@media (prefers-reduced-motion: reduce) { .motif * { animation: none !important; } }

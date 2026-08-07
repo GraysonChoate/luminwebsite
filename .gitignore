@@ -39,3 +39,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ─── Large local masters ──────────────────────────────────────────────────
+# `media-masters/` holds working masters, not shipped assets. Some of it is
+# already tracked (eco, void, media) and stays that way — but two directories
+# must not enter git history:
+#
+#  · hero-film/ is the LOSSLESS 4K opening composite at 443MB in a single
+#    file. GitHub hard-rejects anything over 100MB, so committing it would
+#    fail the push outright. It is regenerable from the approved bridge plus
+#    APPROVED_SCENE_ANIMATIONS/ORIGINALS, and the shipped derivatives under
+#    public/media/hero-film/ are what the site actually uses.
+#  · _retired-*/ is media we have taken OUT of the build. Putting it into
+#    history to record that we stopped using it would be backwards.
+/media-masters/hero-film/
+/media-masters/_retired-*/

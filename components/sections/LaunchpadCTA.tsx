@@ -218,6 +218,29 @@ export default function LaunchpadCTA() {
   /** true when the orbit was reached by a nav jump rather than by flying
    *  there — the backdrop is the arrival still, not the 31s film. */
   const [orbitStill, setOrbitStill] = useState(false);
+
+  /** The welcome film settles IN once orbit is reached, instead of being there
+   *  the instant the phase flips. Arriving somewhere and finding a video
+   *  already playing reads as a jump cut; a beat of empty sky first, then the
+   *  film easing up out of it, reads as landing. Reset on leaving so it plays
+   *  again on the next arrival rather than only ever the first time. */
+  const [filmIn, setFilmIn] = useState(false);
+  useEffect(() => {
+    if (phase !== "orbit") { setFilmIn(false); return; }
+    const t = window.setTimeout(() => setFilmIn(true), 650);
+    return () => window.clearTimeout(t);
+  }, [phase]);
+
+  /** The Earth idle fades up on arrival, on whichever route got us here. The
+   *  short delay is only so the element mounts at opacity 0 first — without a
+   *  frame at the start value the transition has nothing to run from and the
+   *  loop would cut in. */
+  const [earthIn, setEarthIn] = useState(false);
+  useEffect(() => {
+    if (phase !== "orbit") { setEarthIn(false); return; }
+    const t = window.setTimeout(() => setEarthIn(true), 120);
+    return () => window.clearTimeout(t);
+  }, [phase]);
   /** Text answers only count once they are COMMITTED with Enter.
    *  Without this the panel lit a row on the first keystroke — you typed one
    *  letter and the gate rewarded you, which made the power-up feel automatic
@@ -441,10 +464,37 @@ export default function LaunchpadCTA() {
         </video>
       )}
 
+      {/* Base plate for the NAV-JUMP path only. Arriving that way there is no
+          launch film underneath, so the loop needs something to fade up from —
+          its own first frame, so the dissolve is invisible here. */}
       {orbitStill && (
         <img
-          src="/void/cta/ORBIT-final-frame.png" alt=""
+          src="/void/cta/orbit-earth-idle-poster.jpg" alt=""
           className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        />
+      )}
+
+      {/* THE IDLE LOOP — the same asset on BOTH routes into orbit.
+          It used to render only when `orbitStill` was set, which the nav jump
+          is the only thing that does. Through the real launch sequence it never
+          appeared at all: the 31s film simply held its last frame, so the Earth
+          was alive one way in and dead the other.
+          It fades up rather than cutting, because its first frame does not sit
+          on the launch film's last frame (0.72) — the generator re-rendered the
+          Earth instead of continuing from the plate, twice. A one-second
+          dissolve absorbs that. It happens once on arrival, NOT at the loop
+          point: the loop itself is a hard cut on a matched frame and stays
+          blur-free. */}
+      {phase === "orbit" && (
+        <video
+          src="/void/cta/orbit-earth-idle.mp4"
+          autoPlay muted loop playsInline
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          style={{
+            opacity: earthIn ? 1 : 0,
+            transition: "opacity 1000ms ease",
+          }}
         />
       )}
 
@@ -680,17 +730,60 @@ export default function LaunchpadCTA() {
              and the booking step earns the strongest position on screen. */}
       {phase === "orbit" && (
         <>
-          <div className="absolute inset-y-0 left-0 z-20 flex w-[52vw] items-center justify-center">
-            <div
-              className="flex aspect-video w-[min(44vw,660px)] items-center justify-center rounded-[22px] border"
+          {/* WELCOME FILM — placeholder footage until the real one exists.
+              No frame, no border, no plate: the film has to look like it is
+              PROJECTED into the starfield, not pasted on top of it. Three
+              things do that and all three matter.
+              1. A soft mask on both axes dissolves every edge into the sky, so
+                 there is no rectangle. Two linear gradients intersected feather
+                 the sides while keeping the middle fully readable — a radial
+                 mask would have eaten the corners of the frame.
+              2. Slight transparency lets stars carry through the darker areas.
+              3. `screen` blending drops the near-black background of the source
+                 entirely, which is what stops it reading as a floating tile.
+              Sized off the natural 2658x1964 of the recording rather than
+              forced to 16:9, so nothing is cropped. */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-20 flex w-[68vw] items-center justify-center">
+            <video
+              src="/media/welcome-film-preview.mp4"
+              autoPlay
+              muted
+              loop
+              playsInline
+              aria-hidden="true"
+              className="w-[min(66vw,1100px)]"
               style={{
-                borderColor: "rgba(255,255,255,0.22)",
-                background: "rgba(255,255,255,0.05)",
-                backdropFilter: "blur(3px)",
+                aspectRatio: "1280 / 902",
+                objectFit: "cover",
+                // Eases up out of the sky rather than cutting in. The slight
+                // scale settle is what sells it as arriving instead of simply
+                // becoming visible.
+                opacity: filmIn ? 0.82 : 0,
+                transform: filmIn ? "scale(1)" : "scale(1.03)",
+                transition: "opacity 1.6s cubic-bezier(.2,.8,.2,1), transform 2s cubic-bezier(.2,.8,.2,1)",
+                mixBlendMode: "screen",
+                /* A soft ellipse centred on HIM rather than a rectangle on the
+                   frame. He holds full strength in the core; the room, the blue
+                   wall and the bikes fall away through a wide mid-band and are
+                   gone by the edges — so what survives is the person, not a
+                   tile of footage. It also swallows the burned-in subtitles the
+                   screen recording clipped at its left edge, which sit out in
+                   the faded zone. */
+                /* Two masks intersected, because they do two different jobs.
+                   The ellipse isolates HIM from the room. The linear pass
+                   guarantees the bottom actually reaches zero — the ellipse
+                   alone could not, because its lower edge fell past the frame,
+                   which is why the bottom stayed a hard line while the other
+                   three sides blended. He runs to the bottom of frame, so this
+                   necessarily fades his lower torso — which is the point. */
+                WebkitMaskImage:
+                  "radial-gradient(ellipse 58% 78% at 40% 48%, #000 32%, rgba(0,0,0,0.55) 62%, rgba(0,0,0,0.16) 84%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 9%, #000 62%, transparent 100%)",
+                maskImage:
+                  "radial-gradient(ellipse 58% 78% at 40% 48%, #000 32%, rgba(0,0,0,0.55) 62%, rgba(0,0,0,0.16) 84%, transparent 100%), linear-gradient(to bottom, transparent 0%, #000 9%, #000 62%, transparent 100%)",
+                WebkitMaskComposite: "source-in",
+                maskComposite: "intersect",
               }}
-            >
-              <span className="type-eyebrow text-white/45">welcome film</span>
-            </div>
+            />
           </div>
           <div className="absolute right-[5vw] top-[14vh] z-20 w-[min(30vw,430px)]">
             <div

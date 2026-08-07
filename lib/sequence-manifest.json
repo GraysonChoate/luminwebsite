@@ -1,0 +1,48 @@
+{
+  "version": "2026-08-07-approved-4k",
+  "archive": "APPROVED_SCENE_ANIMATIONS/4K",
+  "video": { "width": 3840, "height": 2160, "fps": 24 },
+  "live_site_modified": true,
+  "openingComposite": {
+    "file": "00-orb-bridge-to-01-pro-checkin.mp4",
+    "sourceTransition": "00-orb-to-01-pro-checkin.mp4",
+    "duration": 10,
+    "frames": 240,
+    "bridgeFrames": 96,
+    "deduplicatedSourceFrames": 144,
+    "handoffFrame": 181,
+    "bridgeSha256": "5abe371dab1ed01d2a8f5b48024634184a37f2a68f9ae209ce33773a80e2a1f4"
+  },
+  "sequence": [
+    {"order":0,"type":"transition","from":"orb-entry","to":"check-in","file":"00-orb-to-01-pro-checkin.mp4","duration":6.041667},
+    {"order":1,"type":"idle","stop":"check-in","suite":"pro","products":["Loops","Core"],"file":"01-pro-checkin-idle.mp4","duration":8.041667},
+    {"order":2,"type":"transition","from":"check-in","to":"connect","file":"01-pro-checkin-to-02-pro-connect.mp4","duration":6.041667},
+    {"order":3,"type":"idle","stop":"connect","suite":"pro","products":["Connect"],"file":"02-pro-connect-idle.mp4","duration":8.041667},
+    {"order":4,"type":"transition","from":"connect","to":"command-asset","file":"02-pro-connect-to-03-pro-command-asset.mp4","duration":6.06},
+    {"order":5,"type":"idle","stop":"command-asset","suite":"pro","products":["Command Center","Asset Management"],"file":"03-pro-command-asset-idle.mp4","duration":8.041667},
+    {"order":6,"type":"transition","from":"command-asset","to":"academy","file":"03-pro-command-asset-to-04-pro-academy.mp4","duration":6.041667},
+    {"order":7,"type":"idle","stop":"academy","suite":"pro","products":["Academy"],"file":"04-pro-academy-idle.mp4","duration":8.041667},
+    {"order":8,"type":"transition","from":"academy","to":"trainer","file":"04-pro-academy-to-05-one-trainer.mp4","duration":7.041667},
+    {"order":9,"type":"idle","stop":"trainer","suite":"one","products":["Trainer"],"file":"05-one-trainer-idle-approved-fallback.mp4","duration":8.041667},
+    {"order":10,"type":"transition","from":"trainer","to":"companion","file":"05-one-trainer-to-06-one-companion.mp4","duration":6.06},
+    {"order":11,"type":"idle","stop":"companion","suite":"one","products":["Companion"],"file":"06-one-companion-idle.mp4","duration":8.041667},
+    {"order":12,"type":"transition","from":"companion","to":"station","file":"06-one-companion-to-07-one-station.mp4","duration":6.041667},
+    {"order":13,"type":"idle","stop":"station","suite":"one","products":["Station"],"file":"07-one-station-idle.mp4","duration":8.041667},
+    {"order":14,"type":"transition","from":"station","to":"studio","file":"07-one-station-to-08-one-studio.mp4","duration":7.041667},
+    {"order":15,"type":"idle","stop":"studio","suite":"one","products":["Studio"],"file":"08-one-studio-idle.mp4","duration":8.041667},
+    {"order":16,"type":"transition","from":"studio","to":"fuel","file":"08-one-studio-to-09-one-fuel.mp4","duration":6.041667},
+    {"order":17,"type":"idle","stop":"fuel","suite":"one","products":["Fuel"],"file":"09-one-fuel-idle.mp4","duration":8.041667},
+    {"order":18,"type":"transition","from":"fuel","to":"mrkt","file":"09-one-fuel-to-10-one-mrkt.mp4","duration":6.041667},
+    {"order":19,"type":"idle","stop":"mrkt","suite":"one","products":["MRKT"],"file":"10-one-mrkt-idle.mp4","duration":8.057007},
+    {"order":20,"type":"transition","from":"mrkt","to":"orb-descend","file":"10-one-mrkt-to-orb-descend.mp4","duration":5.061995},
+    {"order":21,"type":"transition","from":"orb-descend","to":"ecosystem","file":"11-orb-descend-to-ecosystem.mp4","duration":6.041667}
+  ],
+  "retired": [
+    "03-pro-command-asset-inbound.mp4",
+    "*-backup.mp4",
+    "91bd3366-1f04-4fc5-bffb-ba1f18154b02",
+    "be5da94a-081a-433f-96f0-bd5d799ded11",
+    "f5ed553c-cbed-4660-9aa4-bd5b02934801",
+    "a0056521-ebde-469d-a64e-98ae08c22f10"
+  ]
+}

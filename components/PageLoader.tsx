@@ -25,9 +25,28 @@ export default function PageLoader() {
   const rootRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoFailed, setVideoFailed] = useState(false);
-  const [done, setDone] = useState(false);
+  /**
+   * SKIP THE OPENING WHEN THE VISITOR ASKED FOR SOMEWHERE ELSE.
+   *
+   * This loader sits at z-[999], above everything, and plays the orb-emerge
+   * clip on every load. That is right for arriving at the film's start — and
+   * wrong for a deep link: returning from a product page to `#ecosystem` or to
+   * `#product-<stop>` made the visitor sit through the whole opening before
+   * being taken where the link said. The sections below cover their own
+   * arrivals, but their covers are BENEATH this one, so nothing they did could
+   * help. Deep links start already-lifted.
+   */
+  const deepLink =
+    typeof window !== "undefined" && /^#(ecosystem|product-|cta|schedule)/.test(window.location.hash);
+  const [done, setDone] = useState(deepLink);
 
   useEffect(() => {
+    if (deepLink) {
+      // downstream still needs the signal it waits on
+      (window as unknown as { __luminEmergeDone?: boolean }).__luminEmergeDone = true;
+      window.dispatchEvent(new Event("lumin:emergeDone"));
+      return;
+    }
     const v = videoRef.current;
     if (v) v.play().catch(() => setVideoFailed(true));
 
@@ -68,7 +87,7 @@ export default function PageLoader() {
       clearTimeout(liftTimer);
       clearTimeout(maxTimer);
     };
-  }, []);
+  }, [deepLink]);
 
   // if the clip fails to decode, don't hold the page — drop after the floor
   useEffect(() => {

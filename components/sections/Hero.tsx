@@ -80,6 +80,9 @@ export default function Hero() {
    *  owns the parked frame, exactly as before. */
   const [legCaption, setLegCaption] = useState<string | null>(null);
   const [openingDone, setOpeningDone] = useState(false);
+  /** Arriving at /#product-<stop> is a real page load. The film must not play
+   *  its opening on the way to the scene the visitor asked for. */
+  const [stopCover, setStopCover] = useState(false);
   /**
    * THE BRIEF'S REAL HEIGHT, MEASURED — never estimated.
    *
@@ -125,9 +128,23 @@ export default function Hero() {
   useEffect(() => {
     const section = sectionRef.current!;
 
-    // park on the opening orb immediately, through the same player and the
-    // same atomic swap every other stop uses
-    filmRef.current?.parkOn(-1);
+    /* PARK WHERE THE VISITOR ASKED FOR, NOT ON THE ORB.
+       This used to park on the opening orb unconditionally and let the deep
+       link swap to the real stop afterwards — so returning from a product page
+       played the opening for the better part of a second and THEN cut to the
+       gym scene. Resolving the target first means the orb is never loaded on
+       that path at all. */
+    const stopFromHash = () => {
+      const m = /^#product-(.+)$/.exec(window.location.hash);
+      if (!m) return -1;
+      const want = m[1].toLowerCase();
+      return STOPS.findIndex(
+        (st) => st.id === want || st.products.some((pr) => pr.toLowerCase().replace(/\s+/g, "-") === want),
+      );
+    };
+    const initialStop = stopFromHash();
+    if (initialStop >= 0) setStopCover(true);
+    filmRef.current?.parkOn(initialStop >= 0 ? initialStop : -1);
 
     /* THE CURSOR-FOLLOWING SCROLL HINT IS GONE.
        It was a second, redundant prompt: it trailed the pointer saying the same
@@ -160,12 +177,7 @@ export default function Hero() {
     // replaying the film up to it — and the next gesture then steps one leg
     // from there, under exactly the same rules as any other stop.
     const hashStop = () => {
-      const m = /^#product-(.+)$/.exec(window.location.hash);
-      if (!m) return;
-      const want = m[1].toLowerCase();
-      const i = STOPS.findIndex(
-        (s) => s.id === want || s.products.some((p) => p.toLowerCase().replace(/\s+/g, "-") === want),
-      );
+      const i = stopFromHash();
       if (i < 0) return;
       filmRef.current?.parkOn(i);
       stepper.parkAt(i);
@@ -182,9 +194,10 @@ export default function Hero() {
       ScrollTrigger.refresh();
       hashStop();
       if (++restores < 4) window.setTimeout(restore, 160);
+      else window.setTimeout(() => setStopCover(false), 140);
     };
-    if (/^#product-/.test(window.location.hash)) {
-      requestAnimationFrame(() => requestAnimationFrame(() => window.setTimeout(restore, 90)));
+    if (initialStop >= 0) {
+      requestAnimationFrame(() => requestAnimationFrame(() => window.setTimeout(restore, 60)));
     } else {
       hashStop();
     }
@@ -267,6 +280,13 @@ export default function Hero() {
   const bottomSafe = 124;
 
   return (
+    <>
+    {stopCover && (
+      <div
+        aria-hidden="true"
+        style={{ position: "fixed", inset: 0, zIndex: 300, background: "#05070d", pointerEvents: "none" }}
+      />
+    )}
     <section ref={sectionRef} data-nav-tone="dark" className="relative h-[500vh]" style={{ background: "var(--c-cosmos)" }}>
       <div className="sticky top-0 h-screen overflow-clip">
         {/* the film — two alternating surfaces, exactly one ever visible */}
@@ -414,5 +434,6 @@ export default function Hero() {
       </div>
 
     </section>
+    </>
   );
 }

@@ -6,6 +6,7 @@ import type { ProductPage } from "@/lib/productPages";
 import styles from "./ProductPage.module.css";
 import Motif from "./Motif";
 import { signatureFor } from "@/lib/productSignatures";
+import { positioningFor } from "@/lib/featureMaps";
 
 /**
  * A PRODUCT PAGE — the film's briefs finally have somewhere to land.
@@ -133,6 +134,7 @@ export default function ProductPageView({ product }: { product: ProductPage }) {
   const [openInside, setOpenInside] = useState<string | null>(null);
 
   const sig = signatureFor(product.id);
+  const positioning = positioningFor(product.id);
   const wordmark = product.label.split("");
 
   return (
@@ -192,6 +194,16 @@ export default function ProductPageView({ product }: { product: ProductPage }) {
           </h1>
 
           <p className={styles.headline}>{product.headline}</p>
+
+          {/* The business's own settled line for this product, straight from
+              its Product/Feature Map. Only rendered where a map exists — four
+              products have none, and an invented line is worse than no line. */}
+          {positioning && (
+            <p className={styles.positioning}>
+              <i aria-hidden="true" />
+              {positioning}
+            </p>
+          )}
 
           <div className={styles.stageCta}>
             <a className={styles.cta} href="/#cta">

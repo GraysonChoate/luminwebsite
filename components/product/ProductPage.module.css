@@ -539,3 +539,20 @@
   background: linear-gradient(180deg, rgba(var(--suite), .8), rgba(var(--accent), .7));
   border-radius: 8px; border: 2px solid transparent; background-clip: content-box;
 }
+
+/* the Product/Feature Map's "Best Positioning Line" — the sharpest sentence
+   the business has for this product, so it sits directly under the headline */
+.positioning {
+  display: flex; align-items: baseline; gap: .9em;
+  margin: -.4rem 0 clamp(26px, 4.4vh, 52px);
+  font-family: var(--font-montserrat), system-ui, sans-serif;
+  font-size: clamp(11px, .95vw, 14px); font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: rgba(var(--accent), .95);
+  text-shadow: 0 0 26px rgba(var(--accent), .5);
+  animation: pgRise .9s .64s cubic-bezier(.16,.84,.44,1) backwards;
+}
+.positioning i {
+  flex: none; width: 26px; height: 1px; translate: 0 -.3em;
+  background: rgba(var(--accent), .95);
+}

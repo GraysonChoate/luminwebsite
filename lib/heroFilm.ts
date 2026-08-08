@@ -442,10 +442,14 @@ export type Brief = {
 /**
  * ⚠️ DRAFT — NOT APPROVED COPY ⚠️
  *
- * Command Center, Asset Management and Academy are new stops in the approved
- * sequence and have no product copy anywhere in this repo. The three briefs
- * below were drafted from the product meanings recorded in `CONTEXT.md` §9/§10
- * and are marked `draft: true`.
+ * Command Center and Asset Management are new stops in the approved sequence
+ * and have no product copy anywhere in this repo — and no Product/Feature Map
+ * either. The internal maps cover Station, Companion, Trainer, Studio, Fuel,
+ * Academy, Connect and Insights, and stop there. These two briefs were drafted
+ * from the product meanings recorded in `CONTEXT.md` §9/§10 and stay
+ * `draft: true` until real copy exists.
+ *
+ * Academy WAS in this set and is now settled from its own feature map.
  *
  * They are wired in so the layout can actually be verified at every viewport —
  * three empty stops cannot be checked for overlap, centering or nav clearance.
@@ -496,13 +500,16 @@ const BRIEFS: Record<string, Brief> = {
     cta: "Explore Asset Management",
     draft: true,
   },
+  // SETTLED from `Internal/Lumin_Academy_Product_Feature_Map.pdf` — the
+  // proposition is its "Best Positioning Line" verbatim, and the specs are
+  // drawn from its Core Capability Map (AI Course Creation, Assignment +
+  // Tracking, Scale + Consistency). No longer draft.
   Academy: {
     suite: "LUMIN PRO",
     rail: ["PRO", "ACADEMY"],
-    proposition: "Turn your standards into staff who meet them.",
-    specs: ["Courses built from your SOPs", "Certification that is tracked", "Onboarding that scales with headcount"],
+    proposition: "Turn your knowledge into training that scales.",
+    specs: ["SOPs become structured courses", "Assignment and completion tracked", "One playbook across every location"],
     cta: "Explore Academy",
-    draft: true,
   },
   Trainer: {
     suite: "LUMIN ONE",

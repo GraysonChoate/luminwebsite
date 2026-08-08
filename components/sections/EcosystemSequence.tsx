@@ -861,6 +861,10 @@ export default function EcosystemSequence() {
          The cover stays up until the landing is made, so the opening is never
          seen flashing past on the way. */
       setDeepLinkCover(true);
+      // UNCONDITIONAL CEILING. The cover is full-screen and near-black; if
+      // anything below throws, the visitor is left staring at nothing and a
+      // refresh reproduces it. This guarantees it always lifts.
+      window.setTimeout(() => setDeepLinkCover(false), 1800);
       requestAnimationFrame(() =>
         requestAnimationFrame(() =>
           window.setTimeout(() => {

@@ -182,22 +182,45 @@ export default function Hero() {
       filmRef.current?.parkOn(i);
       stepper.parkAt(i);
     };
-    /* RESTORE PROPERLY, AND RE-ASSERT.
-       Calling this once on mount parked the VIDEO on the right stop but left
-       scrollY at 0 with no brief — the section's geometry is not settled on the
-       first frame, so `parkAt` computed its anchor against a page that had not
-       laid out yet. Deferring a frame and re-asserting a few times lands the
-       scroll anchor as well as the picture, which is what makes the brief
-       appear and the next gesture behave. */
-    let restores = 0;
-    const restore = () => {
-      ScrollTrigger.refresh();
-      hashStop();
-      if (++restores < 4) window.setTimeout(restore, 160);
-      else window.setTimeout(() => setStopCover(false), 140);
-    };
+    /* RESTORING A STOP — AND NEVER GETTING STUCK DOING IT.
+       Three rules, each of which exists because breaking it produced a real
+       failure:
+
+       1. THE COVER ALWAYS LIFTS. It is near-black and full-screen, so if the
+          restore chain ever breaks the visitor is left staring at nothing. A
+          hard ceiling clears it no matter what happens below.
+       2. THE HASH IS CONSUMED. It used to stay in the URL, so a refresh
+          reproduced the identical state — if that state was wrong, the page was
+          unrecoverable and refreshing could not help. Consuming it means a
+          reload always returns to a clean film.
+       3. ONE PARK, THEN ONE CORRECTION. The retry storm raced the player's own
+          token: several parkOn calls in flight meant a later one could be
+          invalidated by an earlier one resolving late, which is how it ended up
+          sitting on the orb. Refresh geometry first, park once, then verify and
+          correct at most once. */
+    let ceiling = 0;
+    const lift = () => { window.clearTimeout(ceiling); setStopCover(false); };
     if (initialStop >= 0) {
-      requestAnimationFrame(() => requestAnimationFrame(() => window.setTimeout(restore, 60)));
+      ceiling = window.setTimeout(lift, 1800);      // rule 1 — unconditional
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          ScrollTrigger.refresh();                  // geometry before anchoring
+          hashStop();
+          // rule 2 — a reload from here starts clean
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+          window.setTimeout(() => {
+            // rule 3 — one correction if the anchor did not take
+            const want = Math.round(
+              section.offsetTop + Math.max(1, section.offsetHeight - window.innerHeight) * ANCHORS[initialStop],
+            );
+            if (Math.abs(window.scrollY - want) > 8) {
+              ScrollTrigger.refresh();
+              stepper.parkAt(initialStop);
+            }
+            lift();
+          }, 220);
+        }),
+      );
     } else {
       hashStop();
     }

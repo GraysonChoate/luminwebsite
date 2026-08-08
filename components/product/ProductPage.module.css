@@ -556,3 +556,43 @@
   flex: none; width: 26px; height: 1px; translate: 0 -.3em;
   background: rgba(var(--accent), .95);
 }
+
+/* ── PRODUCT SYMBOL ───────────────────────────────────────────────────────
+   The same mark that sits on this product's ecosystem node. Masked, not an
+   <img>: that lets it take the suite colour and the accent, so it reads as
+   part of the page rather than a logo dropped on top of it. */
+.symbol {
+  display: block;
+  width: clamp(46px, 4.4vw, 74px);
+  aspect-ratio: 1;
+  margin-bottom: clamp(14px, 2vh, 24px);
+  background: linear-gradient(150deg, rgba(var(--suite-hi), 1), rgba(var(--accent), .95));
+  -webkit-mask-image: var(--symbol);
+  mask-image: var(--symbol);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-size: contain; mask-size: contain;
+  filter: drop-shadow(0 0 18px rgba(var(--suite), .8)) drop-shadow(0 0 44px rgba(var(--accent), .45));
+  animation: symbolIn .8s .06s cubic-bezier(.16,.84,.44,1) backwards;
+}
+@keyframes symbolIn {
+  0%   { opacity: 0; transform: translateY(10px) scale(.86); filter: blur(8px); }
+  100% { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .symbol { animation: none; } }
+
+/* ── BOTH DOORS ───────────────────────────────────────────────────────────
+   Primary returns to where the visitor came from; secondary is the other
+   destination, always available so a product page is never a dead end. */
+.backRow {
+  display: flex; align-items: center; gap: clamp(14px, 2vw, 30px);
+  flex-wrap: wrap;
+  margin-bottom: clamp(20px, 4vh, 44px);
+}
+.backRow .back { margin-bottom: 0; }
+.backAlt {
+  color: rgba(var(--accent), .8);
+  padding-left: clamp(14px, 2vw, 30px);
+  border-left: 1px solid rgba(var(--suite), .32);
+}
+.backAlt:hover { color: #fff; }

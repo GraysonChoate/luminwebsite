@@ -838,31 +838,42 @@ export default function EcosystemSequence() {
     }, section);
 
     if (window.location.hash === "#ecosystem") {
-      /* HIDE THE OPENING WHILE WE TRAVEL, AND DO NOT WAIT FOR THE LOADER.
-         The jump needs real geometry, so it cannot run before first paint —
-         which meant a visitor returning from a product page watched the orb and
-         the top of the film for a beat before being thrown to the hub.
+      /* RETURNING FROM A PRODUCT PAGE.
+         A product page's "Ecosystem" link is a real navigation: the browser
+         lands on a fresh document and nothing was reading the hash, so the
+         visitor was dropped at the top of the film.
 
-         The first attempt at this waited for `lumin:emergeDone` before jumping,
-         which was worse: the loader's emerge clip runs for seconds, so the
-         cover sat black for ~8s. Layout is what the jump actually needs, not
-         the loader, so it goes on the next frames instead — and the gates are
-         released first so nothing else is holding scroll when we land. */
+         ── TWO THINGS THIS GOT WRONG BEFORE ──────────────────────────────
+         1. It fired `releaseGates` + `jumpTo` FOUR times, 140ms apart, to
+            "re-assert" the landing. That fought itself: `releaseScroll()`
+            clears lockedRef and settledRef and removes every listener but does
+            NOT clear heldRef, and `onJump` runs its own re-assert loop over the
+            following frames. Each extra pass tore down listeners while the
+            previous pass was still settling, and the section ended up held,
+            unlistened and unsettled — which is why "Go back" and "Continue
+            journey" did nothing once you arrived this way. It fires ONCE now;
+            `onJump` already re-asserts its own landing internally.
+         2. It left `#ecosystem` in the URL. Nav "Home" reloads the page, so the
+            hash was still there and threw the visitor straight back to the hub
+            — the film could never be restarted. The hash is cleared as soon as
+            it has been acted on.
+
+         The cover stays up until the landing is made, so the opening is never
+         seen flashing past on the way. */
       setDeepLinkCover(true);
-      let tries = 0;
-      const land = () => {
-        window.dispatchEvent(new CustomEvent("lumin:releaseGates"));
-        ScrollTrigger.refresh();
-        window.dispatchEvent(new CustomEvent("lumin:jumpTo", { detail: "ecosystem" }));
-        // Re-assert while Lenis and ScrollTrigger finish settling, exactly as
-        // the nav jump does, then reveal.
-        if (++tries < 4) {
-          window.setTimeout(land, 140);
-        } else {
-          window.setTimeout(() => setDeepLinkCover(false), 200);
-        }
-      };
-      requestAnimationFrame(() => requestAnimationFrame(() => window.setTimeout(land, 80)));
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() =>
+          window.setTimeout(() => {
+            // consume the hash first — nothing may re-trigger this
+            history.replaceState(null, "", window.location.pathname + window.location.search);
+            window.dispatchEvent(new CustomEvent("lumin:releaseGates"));
+            ScrollTrigger.refresh();
+            window.dispatchEvent(new CustomEvent("lumin:jumpTo", { detail: "ecosystem" }));
+            // onJump re-asserts over the next few frames; reveal after that.
+            window.setTimeout(() => setDeepLinkCover(false), 420);
+          }, 90),
+        ),
+      );
     }
 
     return () => {

@@ -133,11 +133,35 @@ export const HERO_TO_PAGE: Record<string, string> = {
   mrkt: "market",        // film says MRKT, ecosystem says market
 };
 
+/**
+ * WHICH SCENE OF THE FILM SHOWS THIS PRODUCT.
+ *
+ * The inverse of HERO_TO_PAGE, so a product page can offer "Back to the gym"
+ * even to someone who arrived from the ecosystem and has never seen the film.
+ * Move maps to the Trainer scene — the film gives Trainer and Companion a scene
+ * each, and Trainer is the one a visitor meets first.
+ */
+export const SCENE_FOR: Record<string, string> = {
+  loops: "check-in",
+  core: "check-in",
+  connect: "connect",
+  "command-center": "command-asset",
+  "asset-management": "command-asset",
+  academy: "academy",
+  move: "trainer",
+  studio: "studio",
+  station: "station",
+  market: "mrkt",
+  fuel: "fuel",
+};
+
 export type ProductPage = ProductHud & {
   /** full path to the ambient clip, or null if the product has no plate */
   ambient: string | null;
   tone: "pro" | "one";
   /** products expressed THROUGH this one, with the film's own brief copy */
+  /** the film stop that shows this product, for "Back to the gym" */
+  scene: string;
   contains: { product: string; anchor: string; brief: Brief; detail?: { positioning: string; body: string; points: [string, string][] } }[];
 };
 
@@ -157,6 +181,7 @@ export const productPage = (id: string): ProductPage | null => {
     ...p,
     ambient: clip ? `/media/hero-film/1080/${clip}` : null,
     tone: p.suite === "Lumin Pro" ? "pro" : "one",
+    scene: SCENE_FOR[id] ?? "check-in",
     contains,
   };
 };

@@ -316,8 +316,27 @@ export const EXIT_CLIP = (() => {
  *  09-fuel-to-10-mrkt              145   6.04s       144        -        -    none
  *  10-mrkt-to-orb-descend          121   5.04s       120        -        -    none
  *
- *  Four clips have no sustained frozen tail and play to their last frame.
- *  Total dead time removed across a full forward traversal: 5.96s.
+ *  Seven clips play to their last frame. Total dead time removed across a full
+ *  forward traversal: 3.54s.
+ *
+ *  ── SUBJECT MOTION IS NOT WHOLE-FRAME MOTION ─────────────────────────────
+ *  Three clips were originally trimmed here and have been put back, because
+ *  the detector was measuring the WHOLE FRAME. A person turning their head is
+ *  a small fraction of a wide shot, so it scores as "frozen" while the subject
+ *  is still very much moving. Re-measured on the subject region alone:
+ *
+ *    clip                          trimmed@  match   end   match
+ *    02-connect-to-03-command           118   8.54   144    6.74
+ *    03-command-to-04-academy           123   5.17   144    4.50
+ *    06-companion-to-07-station         136   2.90   144    2.60
+ *
+ *  On the Command Center leg the cut landed BEFORE the manager finishes
+ *  turning his head, so the idle began with his head already turned and it
+ *  read as a jump. Playing to the end lands 21% closer and completes the turn.
+ *
+ *  The remaining trims were re-checked the same way and are genuinely frozen —
+ *  including the orb opening, where the picture drifts 1.31 across its last 59
+ *  frames against 86.44 for the move itself.
  *
  *  The check-in leg is by far the worst and is the one that was reported: 59 of
  *  its canonical 145 frames are frozen. The playback composite prepends 96
@@ -330,11 +349,11 @@ export const HANDOFF_FRAME: Record<string, number | null> = {
   "00-orb-bridge-to-01-pro-checkin.mp4": 181,          // bridge + transition motion; 59-frame tail excluded
   "00-orb-to-01-pro-checkin.mp4": 86,                  // 59 frozen frames — removes 2.46s
   "01-pro-checkin-to-02-pro-connect.mp4": 139,         // 6 frozen — removes 0.25s
-  "02-pro-connect-to-03-pro-command-asset.mp4": 118,   // 27 frozen — removes 1.12s
-  "03-pro-command-asset-to-04-pro-academy.mp4": 123,   // 22 frozen — removes 0.92s
+  "02-pro-connect-to-03-pro-command-asset.mp4": null,  // plays to the end — see SUBJECT MOTION note
+  "03-pro-command-asset-to-04-pro-academy.mp4": null,  // plays to the end — see SUBJECT MOTION note
   "04-pro-academy-to-05-one-trainer.mp4": 156,         // 13 frozen — removes 0.54s
   "05-one-trainer-to-06-one-companion.mp4": null,      // moves to its last frame
-  "06-one-companion-to-07-one-station.mp4": 136,       // 9 frozen — removes 0.38s
+  "06-one-companion-to-07-one-station.mp4": null,      // plays to the end — see SUBJECT MOTION note
   "07-one-station-to-08-one-studio.mp4": null,         // moves to its last frame
   "08-one-studio-to-09-one-fuel.mp4": 138,             // 7 frozen — removes 0.29s
   "09-one-fuel-to-10-one-mrkt.mp4": null,              // moves to its last frame

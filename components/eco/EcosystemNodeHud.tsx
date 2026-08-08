@@ -87,6 +87,10 @@ export default function EcosystemNodeHud({ active }: { active: boolean }) {
                 aria-label={`Open the ${product.label} by Lumin page`}
                 onMouseEnter={() => setHoveredSuite(product.suite)}
                 onFocus={() => setHoveredSuite(product.suite)}
+                onClick={() => {
+                  // came from the hub, so "back" should return to the hub
+                  try { sessionStorage.setItem("lumin:returnTo", "#ecosystem"); } catch { /* private mode */ }
+                }}
               />
             ))}
             {/* ── NODE NAMES ────────────────────────────────────────────

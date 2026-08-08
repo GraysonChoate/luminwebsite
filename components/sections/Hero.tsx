@@ -56,6 +56,13 @@ function coverPoint(vw: number, vh: number, sx: number, sy: number, focalPct: nu
   return { left, top, scale };
 }
 
+/** Remember where the visitor was when they left, so the product page can
+ *  offer a way BACK THERE rather than always dumping them at the ecosystem.
+ *  sessionStorage because it survives the navigation and dies with the tab. */
+const rememberReturn = (hash: string) => {
+  try { sessionStorage.setItem("lumin:returnTo", hash); } catch { /* private mode */ }
+};
+
 const clamp = (v: number, lo: number, hi: number) => (hi < lo ? (lo + hi) / 2 : Math.min(Math.max(v, lo), hi));
 
 export default function Hero() {
@@ -163,7 +170,24 @@ export default function Hero() {
       filmRef.current?.parkOn(i);
       stepper.parkAt(i);
     };
-    hashStop();
+    /* RESTORE PROPERLY, AND RE-ASSERT.
+       Calling this once on mount parked the VIDEO on the right stop but left
+       scrollY at 0 with no brief — the section's geometry is not settled on the
+       first frame, so `parkAt` computed its anchor against a page that had not
+       laid out yet. Deferring a frame and re-asserting a few times lands the
+       scroll anchor as well as the picture, which is what makes the brief
+       appear and the next gesture behave. */
+    let restores = 0;
+    const restore = () => {
+      ScrollTrigger.refresh();
+      hashStop();
+      if (++restores < 4) window.setTimeout(restore, 160);
+    };
+    if (/^#product-/.test(window.location.hash)) {
+      requestAnimationFrame(() => requestAnimationFrame(() => window.setTimeout(restore, 90)));
+    } else {
+      hashStop();
+    }
     window.addEventListener("hashchange", hashStop);
 
     return () => {
@@ -298,6 +322,7 @@ export default function Hero() {
                         <circle cx={pt.left} cy={pt.top} r="3" fill={tone === "one" ? "#d9b8f0" : "var(--c-supernova)"} className="hero-cue-core" />
                       </svg>
                       <a href={`/products/${HERO_TO_PAGE[href] ?? href}`}
+                        onClick={() => rememberReturn(`#product-${stop.id}`)}
                         className={`hero-brief pointer-events-auto absolute${brief ? " hero-brief--hud hero-brief--grouped" : ""}`}
                         data-side="r" data-suite={tone} data-product={href} data-layout={asRow ? "row" : "stack"}
                         style={{ position: "absolute", left: cardLeft, top: cardTop, width: cardW, height: cardH }}>
@@ -343,6 +368,7 @@ export default function Hero() {
                 </svg>
               )}
               <a ref={briefRef} href={`/products/${HERO_TO_PAGE[href] ?? href}`}
+                onClick={() => rememberReturn(`#product-${stop.id}`)}
                 className={`hero-brief pointer-events-auto absolute${brief ? " hero-brief--hud" : ""} hero-brief--centered`}
                 data-side="center" data-suite={tone} data-product={href}
                 style={{ position: "absolute", left: "50%", top: n.centered ? "46%" : cy, width: briefW, transform: "translate(-50%, -50%)" }}>

@@ -132,6 +132,26 @@ export default function ProductPageView({ product }: { product: ProductPage }) {
   /** which contained product is open. Move's overarching story is the page;
    *  Trainer and Companion open on top of it rather than replacing it. */
   const [openInside, setOpenInside] = useState<string | null>(null);
+  /** Where "back" goes. A product page can be reached from the film OR from
+   *  the ecosystem hub, and it used to assume the hub — so leaving the film at
+   *  Station and coming back landed you past the whole film. */
+  const [back, setBack] = useState<{ href: string; label: string }>({ href: "/#ecosystem", label: "Back to the ecosystem" });
+  const [alt, setAlt] = useState<{ href: string; label: string }>({ href: `/#product-${product.scene}`, label: "Back to the gym" });
+  useEffect(() => {
+    let to = "";
+    try { to = sessionStorage.getItem("lumin:returnTo") || ""; } catch { /* private mode */ }
+    if (to.startsWith("#product-")) {
+      // came from the film — put them back exactly where they left it, and
+      // still offer the whole ecosystem for anyone wanting to skip ahead
+      setBack({ href: "/" + to, label: "Back to the gym" });
+      setAlt({ href: "/#ecosystem", label: "Explore the ecosystem" });
+    } else {
+      // came from the hub (or straight to the URL) — the hub is "back", and
+      // the film scene this product appears in is the onward door
+      setBack({ href: "/#ecosystem", label: "Back to the ecosystem" });
+      setAlt({ href: `/#product-${product.scene}`, label: "See it in the gym" });
+    }
+  }, [product.scene]);
 
   const sig = signatureFor(product.id);
   const positioning = positioningFor(product.id);
@@ -171,9 +191,28 @@ export default function ProductPageView({ product }: { product: ProductPage }) {
         <Motif mode={sig.mode} />
 
         <div className={styles.stageInner}>
-          <a className={styles.back} href="/#ecosystem">
-            <span aria-hidden="true">‹</span> Ecosystem
-          </a>
+          {/* BOTH DOORS ARE ALWAYS OPEN. The primary returns you to whichever
+              place you actually came from; the secondary is the other one, so
+              nobody is ever trapped on a product page and anyone can jump
+              straight to the whole ecosystem if they want to skip ahead. */}
+          <nav className={styles.backRow} aria-label="Return">
+            <a className={styles.back} href={back.href}>
+              <span aria-hidden="true">‹</span> {back.label}
+            </a>
+            <a className={`${styles.back} ${styles.backAlt}`} href={alt.href}>
+              {alt.label} <span aria-hidden="true">›</span>
+            </a>
+          </nav>
+
+          {/* THE PRODUCT'S OWN SYMBOL — the same mark used on its ecosystem
+              node, so the node you clicked and the page you land on are
+              visibly the same object. Masked rather than <img> so it takes the
+              page's suite colour instead of arriving as a foreign asset. */}
+          <span
+            className={styles.symbol}
+            style={{ "--symbol": `url(/eco/symbols/${product.id}.svg)` } as CSSProperties}
+            aria-hidden="true"
+          />
 
           <p className={styles.kicker}>
             <span className={styles.kickerSuite}>{product.suite}</span>
